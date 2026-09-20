@@ -1,0 +1,219 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1000" width="1160" height="1000" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect x="0" y="0" width="1160" height="1000" fill="#FFFFFF"/>
+
+  <text x="40" y="44" font-size="26" font-weight="700" fill="#15201B">Stock Clock — wiring</text>
+  <text x="40" y="70" font-size="14" fill="#51605A">Raspberry Pi 5 · 4 load cells · 4 HX711 · 4 RGB LEDs · 1 button · DS3231 clock</text>
+
+  <!-- ─────────── LEGEND ─────────── -->
+  <g font-size="12" fill="#51605A">
+    <rect x="40" y="86" width="12" height="12" fill="#E8A33D"/><text x="58" y="97">3.3 V</text>
+    <rect x="110" y="86" width="12" height="12" fill="#4A4A4A"/><text x="128" y="97">GND</text>
+    <rect x="178" y="86" width="12" height="12" fill="#2E7DB8"/><text x="196" y="97">HX711</text>
+    <rect x="252" y="86" width="12" height="12" fill="#3E9B54"/><text x="270" y="97">LED</text>
+    <rect x="316" y="86" width="12" height="12" fill="#1F8A8A"/><text x="334" y="97">Clock</text>
+    <rect x="386" y="86" width="12" height="12" fill="#8055B0"/><text x="404" y="97">Button</text>
+  </g>
+
+  <text x="40" y="128" font-size="15" font-weight="700" fill="#15201B">The 40-pin header</text>
+  <text x="40" y="146" font-size="11" fill="#86918C">Pin 1 is the corner nearest the microSD slot. Count carefully — one pin off is the most common mistake.</text>
+
+  <!-- ─────────── HEADER ─────────── -->
+  <g font-size="11">
+    <!-- row 0 -->
+    <rect x="252" y="160" width="36" height="24" fill="#E8A33D"/><text x="270" y="176" text-anchor="middle" fill="#FFF" font-weight="700">1</text>
+    <text x="246" y="176" text-anchor="end" fill="#15201B">3.3 V → all four HX711 VCC</text>
+    <rect x="292" y="160" width="36" height="24" fill="#CCCCCC"/><text x="310" y="176" text-anchor="middle" fill="#FFF" font-weight="700">2</text>
+    <text x="334" y="176" fill="#86918C">5 V — not used</text>
+    <!-- row 1 -->
+    <rect x="252" y="190" width="36" height="24" fill="#1F8A8A"/><text x="270" y="206" text-anchor="middle" fill="#FFF" font-weight="700">3</text>
+    <text x="246" y="206" text-anchor="end" fill="#15201B">GPIO 2 → DS3231 SDA</text>
+    <rect x="292" y="190" width="36" height="24" fill="#CCCCCC"/><text x="310" y="206" text-anchor="middle" fill="#FFF" font-weight="700">4</text>
+    <text x="334" y="206" fill="#86918C">5 V — not used</text>
+    <!-- row 2 -->
+    <rect x="252" y="220" width="36" height="24" fill="#1F8A8A"/><text x="270" y="236" text-anchor="middle" fill="#FFF" font-weight="700">5</text>
+    <text x="246" y="236" text-anchor="end" fill="#15201B">GPIO 3 → DS3231 SCL</text>
+    <rect x="292" y="220" width="36" height="24" fill="#4A4A4A"/><text x="310" y="236" text-anchor="middle" fill="#FFF" font-weight="700">6</text>
+    <text x="334" y="236" fill="#15201B">GND → breadboard ground rail</text>
+    <!-- row 3 -->
+    <rect x="252" y="250" width="36" height="24" fill="#CCCCCC"/><text x="270" y="266" text-anchor="middle" fill="#FFF" font-weight="700">7</text>
+    <text x="246" y="266" text-anchor="end" fill="#86918C">—</text>
+    <rect x="292" y="250" width="36" height="24" fill="#CCCCCC"/><text x="310" y="266" text-anchor="middle" fill="#FFF" font-weight="700">8</text>
+    <text x="334" y="266" fill="#86918C">—</text>
+    <!-- row 4 -->
+    <rect x="252" y="280" width="36" height="24" fill="#4A4A4A"/><text x="270" y="296" text-anchor="middle" fill="#FFF" font-weight="700">9</text>
+    <text x="246" y="296" text-anchor="end" fill="#15201B">GND</text>
+    <rect x="292" y="280" width="36" height="24" fill="#CCCCCC"/><text x="310" y="296" text-anchor="middle" fill="#FFF" font-weight="700">10</text>
+    <text x="334" y="296" fill="#86918C">—</text>
+    <!-- row 5 -->
+    <rect x="252" y="310" width="36" height="24" fill="#3E9B54"/><text x="270" y="326" text-anchor="middle" fill="#FFF" font-weight="700">11</text>
+    <text x="246" y="326" text-anchor="end" fill="#15201B">GPIO 17 → LED 1 RED leg</text>
+    <rect x="292" y="310" width="36" height="24" fill="#CCCCCC"/><text x="310" y="326" text-anchor="middle" fill="#FFF" font-weight="700">12</text>
+    <text x="334" y="326" fill="#86918C">—</text>
+    <!-- row 6 -->
+    <rect x="252" y="340" width="36" height="24" fill="#3E9B54"/><text x="270" y="356" text-anchor="middle" fill="#FFF" font-weight="700">13</text>
+    <text x="246" y="356" text-anchor="end" fill="#15201B">GPIO 27 → LED 1 GREEN leg</text>
+    <rect x="292" y="340" width="36" height="24" fill="#4A4A4A"/><text x="310" y="356" text-anchor="middle" fill="#FFF" font-weight="700">14</text>
+    <text x="334" y="356" fill="#15201B">GND</text>
+    <!-- row 7 -->
+    <rect x="252" y="370" width="36" height="24" fill="#3E9B54"/><text x="270" y="386" text-anchor="middle" fill="#FFF" font-weight="700">15</text>
+    <text x="246" y="386" text-anchor="end" fill="#15201B">GPIO 22 → LED 2 RED leg</text>
+    <rect x="292" y="370" width="36" height="24" fill="#3E9B54"/><text x="310" y="386" text-anchor="middle" fill="#FFF" font-weight="700">16</text>
+    <text x="334" y="386" fill="#15201B">GPIO 23 → LED 2 GREEN leg</text>
+    <!-- row 8 -->
+    <rect x="252" y="400" width="36" height="24" fill="#E8A33D"/><text x="270" y="416" text-anchor="middle" fill="#FFF" font-weight="700">17</text>
+    <text x="246" y="416" text-anchor="end" fill="#15201B">3.3 V → DS3231 VCC</text>
+    <rect x="292" y="400" width="36" height="24" fill="#3E9B54"/><text x="310" y="416" text-anchor="middle" fill="#FFF" font-weight="700">18</text>
+    <text x="334" y="416" fill="#15201B">GPIO 24 → LED 3 RED leg</text>
+    <!-- row 9 -->
+    <rect x="252" y="430" width="36" height="24" fill="#CCCCCC"/><text x="270" y="446" text-anchor="middle" fill="#FFF" font-weight="700">19</text>
+    <text x="246" y="446" text-anchor="end" fill="#86918C">—</text>
+    <rect x="292" y="430" width="36" height="24" fill="#4A4A4A"/><text x="310" y="446" text-anchor="middle" fill="#FFF" font-weight="700">20</text>
+    <text x="334" y="446" fill="#15201B">GND</text>
+    <!-- row 10 -->
+    <rect x="252" y="460" width="36" height="24" fill="#CCCCCC"/><text x="270" y="476" text-anchor="middle" fill="#FFF" font-weight="700">21</text>
+    <text x="246" y="476" text-anchor="end" fill="#86918C">—</text>
+    <rect x="292" y="460" width="36" height="24" fill="#3E9B54"/><text x="310" y="476" text-anchor="middle" fill="#FFF" font-weight="700">22</text>
+    <text x="334" y="476" fill="#15201B">GPIO 25 → LED 3 GREEN leg</text>
+    <!-- row 11 -->
+    <rect x="252" y="490" width="36" height="24" fill="#CCCCCC"/><text x="270" y="506" text-anchor="middle" fill="#FFF" font-weight="700">23</text>
+    <text x="246" y="506" text-anchor="end" fill="#86918C">—</text>
+    <rect x="292" y="490" width="36" height="24" fill="#3E9B54"/><text x="310" y="506" text-anchor="middle" fill="#FFF" font-weight="700">24</text>
+    <text x="334" y="506" fill="#15201B">GPIO 8 → LED 4 RED leg</text>
+    <!-- row 12 -->
+    <rect x="252" y="520" width="36" height="24" fill="#4A4A4A"/><text x="270" y="536" text-anchor="middle" fill="#FFF" font-weight="700">25</text>
+    <text x="246" y="536" text-anchor="end" fill="#15201B">GND</text>
+    <rect x="292" y="520" width="36" height="24" fill="#3E9B54"/><text x="310" y="536" text-anchor="middle" fill="#FFF" font-weight="700">26</text>
+    <text x="334" y="536" fill="#15201B">GPIO 7 → LED 4 GREEN leg</text>
+    <!-- row 13 -->
+    <rect x="252" y="550" width="36" height="24" fill="#CCCCCC"/><text x="270" y="566" text-anchor="middle" fill="#FFF" font-weight="700">27</text>
+    <text x="246" y="566" text-anchor="end" fill="#86918C">leave empty</text>
+    <rect x="292" y="550" width="36" height="24" fill="#CCCCCC"/><text x="310" y="566" text-anchor="middle" fill="#FFF" font-weight="700">28</text>
+    <text x="334" y="566" fill="#86918C">leave empty</text>
+    <!-- row 14 -->
+    <rect x="252" y="580" width="36" height="24" fill="#2E7DB8"/><text x="270" y="596" text-anchor="middle" fill="#FFF" font-weight="700">29</text>
+    <text x="246" y="596" text-anchor="end" fill="#15201B">GPIO 5 → HX711 #1 DT</text>
+    <rect x="292" y="580" width="36" height="24" fill="#4A4A4A"/><text x="310" y="596" text-anchor="middle" fill="#FFF" font-weight="700">30</text>
+    <text x="334" y="596" fill="#15201B">GND</text>
+    <!-- row 15 -->
+    <rect x="252" y="610" width="36" height="24" fill="#2E7DB8"/><text x="270" y="626" text-anchor="middle" fill="#FFF" font-weight="700">31</text>
+    <text x="246" y="626" text-anchor="end" fill="#15201B">GPIO 6 → HX711 #1 SCK</text>
+    <rect x="292" y="610" width="36" height="24" fill="#2E7DB8"/><text x="310" y="626" text-anchor="middle" fill="#FFF" font-weight="700">32</text>
+    <text x="334" y="626" fill="#15201B">GPIO 12 → HX711 #2 DT</text>
+    <!-- row 16 -->
+    <rect x="252" y="640" width="36" height="24" fill="#2E7DB8"/><text x="270" y="656" text-anchor="middle" fill="#FFF" font-weight="700">33</text>
+    <text x="246" y="656" text-anchor="end" fill="#15201B">GPIO 13 → HX711 #2 SCK</text>
+    <rect x="292" y="640" width="36" height="24" fill="#4A4A4A"/><text x="310" y="656" text-anchor="middle" fill="#FFF" font-weight="700">34</text>
+    <text x="334" y="656" fill="#15201B">GND</text>
+    <!-- row 17 -->
+    <rect x="252" y="670" width="36" height="24" fill="#2E7DB8"/><text x="270" y="686" text-anchor="middle" fill="#FFF" font-weight="700">35</text>
+    <text x="246" y="686" text-anchor="end" fill="#15201B">GPIO 19 → HX711 #3 DT</text>
+    <rect x="292" y="670" width="36" height="24" fill="#2E7DB8"/><text x="310" y="686" text-anchor="middle" fill="#FFF" font-weight="700">36</text>
+    <text x="334" y="686" fill="#15201B">GPIO 16 → HX711 #3 SCK</text>
+    <!-- row 18 -->
+    <rect x="252" y="700" width="36" height="24" fill="#8055B0"/><text x="270" y="716" text-anchor="middle" fill="#FFF" font-weight="700">37</text>
+    <text x="246" y="716" text-anchor="end" fill="#15201B">GPIO 26 → button leg A</text>
+    <rect x="292" y="700" width="36" height="24" fill="#2E7DB8"/><text x="310" y="716" text-anchor="middle" fill="#FFF" font-weight="700">38</text>
+    <text x="334" y="716" fill="#15201B">GPIO 20 → HX711 #4 DT</text>
+    <!-- row 19 -->
+    <rect x="252" y="730" width="36" height="24" fill="#8055B0"/><text x="270" y="746" text-anchor="middle" fill="#FFF" font-weight="700">39</text>
+    <text x="246" y="746" text-anchor="end" fill="#15201B">GND → button leg B</text>
+    <rect x="292" y="730" width="36" height="24" fill="#2E7DB8"/><text x="310" y="746" text-anchor="middle" fill="#FFF" font-weight="700">40</text>
+    <text x="334" y="746" fill="#15201B">GPIO 21 → HX711 #4 SCK</text>
+  </g>
+
+  <!-- ─────────── ONE SLOT ─────────── -->
+  <g>
+    <rect x="600" y="160" width="520" height="230" fill="#F7F9F8" stroke="#D7DDDA"/>
+    <text x="620" y="186" font-size="15" font-weight="700" fill="#15201B">One slot — build this 4 times</text>
+
+    <rect x="620" y="206" width="130" height="66" fill="#FFF" stroke="#AEB8B3"/>
+    <text x="685" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#15201B">5 kg load cell</text>
+    <text x="685" y="248" text-anchor="middle" font-size="10" fill="#51605A">4 wires out</text>
+    <text x="685" y="263" text-anchor="middle" font-size="10" fill="#51605A">arrow points DOWN</text>
+
+    <path d="M750 239 H800" stroke="#4A4A4A" stroke-width="1.5" marker-end="url(#ar)"/>
+
+    <rect x="806" y="206" width="130" height="66" fill="#FFF" stroke="#2E7DB8"/>
+    <text x="871" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#2E7DB8">HX711</text>
+    <text x="871" y="248" text-anchor="middle" font-size="10" fill="#51605A">E+ E− A− A+</text>
+    <text x="871" y="263" text-anchor="middle" font-size="10" fill="#51605A">VCC GND DT SCK</text>
+
+    <path d="M936 239 H986" stroke="#4A4A4A" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="992" y="206" width="110" height="66" fill="#FFF" stroke="#AEB8B3"/>
+    <text x="1047" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#15201B">Pi header</text>
+    <text x="1047" y="254" text-anchor="middle" font-size="10" fill="#51605A">see table left</text>
+
+    <g font-size="11.5" fill="#15201B">
+      <text x="620" y="300" font-weight="700">Load cell wire → HX711 screw terminal</text>
+      <text x="620" y="320">RED → E+     BLACK → E−     WHITE → A−     GREEN → A+</text>
+      <text x="620" y="342" font-weight="700" fill="#B03A2E">If weight going ON makes the number go DOWN, swap GREEN and WHITE.</text>
+      <text x="620" y="360" fill="#51605A">Nothing is damaged by getting it backwards. B+ and B− stay empty.</text>
+      <text x="620" y="378" font-weight="700" fill="#B03A2E">HX711 VCC goes to 3.3 V — never 5 V. 5 V can kill a GPIO pin.</text>
+    </g>
+  </g>
+
+  <!-- ─────────── ONE LED ─────────── -->
+  <g>
+    <rect x="600" y="406" width="520" height="196" fill="#F7F9F8" stroke="#D7DDDA"/>
+    <text x="620" y="432" font-size="15" font-weight="700" fill="#15201B">One LED — build this 4 times</text>
+    <text x="620" y="454" font-size="11.5" fill="#51605A">Common-cathode RGB LED. The longest leg is the cathode. Blue leg is not used.</text>
+
+    <g font-size="11.5" fill="#15201B">
+      <text x="620" y="480">RED leg &#8594; 220 &#937; resistor &#8594; its GPIO pin</text>
+      <text x="620" y="500">GREEN leg &#8594; 220 &#937; resistor &#8594; its GPIO pin</text>
+      <text x="620" y="520">LONGEST leg (cathode) &#8594; ground rail</text>
+      <text x="620" y="540">BLUE leg &#8594; nothing</text>
+    </g>
+
+    <g font-size="11.5">
+      <rect x="880" y="466" width="14" height="14" fill="#3E9B54"/><text x="904" y="478" fill="#15201B">green only = day 1</text>
+      <rect x="880" y="490" width="14" height="14" fill="#E8A33D"/><text x="904" y="502" fill="#15201B">red + green = day 2, cook today</text>
+      <rect x="880" y="514" width="14" height="14" fill="#B03A2E"/><text x="904" y="526" fill="#15201B">red only = day 3+, cook now</text>
+      <rect x="880" y="538" width="14" height="14" fill="#FFF" stroke="#AEB8B3"/><text x="904" y="550" fill="#51605A">both off = slot empty</text>
+    </g>
+    <text x="620" y="576" font-size="11" fill="#86918C">Red and green lit together make amber. That is why no third colour channel is needed.</text>
+  </g>
+
+  <!-- ─────────── BUTTON + CLOCK ─────────── -->
+  <g>
+    <rect x="600" y="618" width="250" height="150" fill="#F7F9F8" stroke="#D7DDDA"/>
+    <text x="620" y="644" font-size="15" font-weight="700" fill="#15201B">Button</text>
+    <g font-size="11.5" fill="#15201B">
+      <text x="620" y="668">One leg &#8594; pin 37 (GPIO 26)</text>
+      <text x="620" y="688">Other leg &#8594; pin 39 (GND)</text>
+      <text x="620" y="712" fill="#51605A">No resistor — the Pi's internal</text>
+      <text x="620" y="728" fill="#51605A">pull-up does the job in software.</text>
+      <text x="620" y="752" fill="#86918C">Switches the screen to the buy list.</text>
+    </g>
+
+    <rect x="870" y="618" width="250" height="150" fill="#F7F9F8" stroke="#D7DDDA"/>
+    <text x="890" y="644" font-size="15" font-weight="700" fill="#15201B">DS3231 clock</text>
+    <g font-size="11.5" fill="#15201B">
+      <text x="890" y="668">VCC &#8594; pin 17 (3.3 V)</text>
+      <text x="890" y="688">GND &#8594; any GND pin</text>
+      <text x="890" y="708">SDA &#8594; pin 3 (GPIO 2)</text>
+      <text x="890" y="728">SCL &#8594; pin 5 (GPIO 3)</text>
+      <text x="890" y="752" fill="#86918C">Keeps the date with no Wi-Fi.</text>
+    </g>
+  </g>
+
+  <!-- ─────────── WARNINGS ─────────── -->
+  <g>
+    <rect x="40" y="790" width="1080" height="176" fill="#FCF3F2" stroke="#B03A2E"/>
+    <text x="64" y="818" font-size="15" font-weight="700" fill="#B03A2E">Read before you plug anything in</text>
+    <g font-size="12.5" fill="#5A1F1A">
+      <text x="64" y="844">1.  Power the Pi OFF while wiring. Only plug the USB-C in once every wire is checked.</text>
+      <text x="64" y="866">2.  HX711 VCC goes to 3.3 V, never 5 V. At 5 V its data pin pushes 5 V into a 3.3 V input and can kill that GPIO pin permanently.</text>
+      <text x="64" y="888">3.  Count pins from pin 1 — the corner nearest the microSD slot. Being one pin out is the single most common failure.</text>
+      <text x="64" y="910">4.  The Pi 5 uses micro-HDMI, not full-size HDMI. You need a micro-HDMI to HDMI cable.</text>
+      <text x="64" y="932">5.  If your DS3231 module came with a non-rechargeable CR2032, take the battery out until you have checked the module does not</text>
+      <text x="82" y="950">    try to charge it — the common ZS-042 board does, and a charged CR2032 can leak or burst. An LIR2032 is the safe cell.</text>
+    </g>
+  </g>
+
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A4A4A"/>
+    </marker>
+  </defs>
+</svg>

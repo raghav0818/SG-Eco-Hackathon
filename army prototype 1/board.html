@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Chope</title>
+<meta http-equiv="refresh" content="5">
+<style>
+  body{margin:0;height:100vh;display:flex;flex-direction:column;justify-content:center;
+       align-items:center;background:#000;color:#fff;font:600 1rem/1.1 system-ui,sans-serif}
+  #n{font-size:34vw;letter-spacing:-.03em}
+  #l{font-size:4vw;opacity:.55;text-transform:uppercase;letter-spacing:.35em}
+  #s{position:fixed;bottom:3vh;font-size:2.4vw;opacity:.45;text-align:center}
+</style>
+<div id="l">chope</div><div id="n">--</div><div id="s">no data yet</div>
+<!-- board.js is written by chope.py as  B={...}  . The meta refresh above re-reads it
+     from disk every 5 s. No fetch (Chromium blocks XHR on file://), no server, no timer. -->
+<script src="board.js"></script>
+<script>
+if (typeof B !== 'undefined') {
+  const v = {
+    open: ['poll open', '--',      'waiting for the cook cutoff'],
+    cook: ['cook',      B.cook,    `${B.eat} eating · ${B.notc} not · ${B.unconf} silent counted at r=${B.r} · +${B.margin} margin`],
+    done: ['eaten',     B.taken,   `cooked ${B.cook} · ${B.left} left over`],
+  }[B.state];
+  if (v) { l.textContent = v[0]; n.textContent = v[1]; s.textContent = v[2] + '  —  ' + B.t; }
+}
+</script>
