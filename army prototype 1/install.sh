@@ -93,7 +93,7 @@ sudo raspi-config nonint do_blanking 1 2>/dev/null || true
 echo
 echo "installed for user $USER_, code in $HERE"
 echo "next, in order:"
-echo "  1.  set -a; . /etc/chope.env; set +a; python3 chope.py check   # proves the token"
+echo "  1.  sudo sh -c 'set -a; . /etc/chope.env; set +a; python3 chope.py check'  # proves the token -- /etc/chope.env is root-only"
 echo "  2.  sudo reboot                                     # board should come up on HDMI"
 echo "  3.  type a number on the keypad + Enter             # only valid after a 'lock'"
 echo "  4.  python3 replay.py                               # the 2 Oct demo, no Telegram needed"
