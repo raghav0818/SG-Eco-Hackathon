@@ -1,0 +1,8 @@
+
+# Chope — secrets and live state must never be committed
+*.env
+chope_state.json
+meals.csv
+board.js
+*.tmp
+__pycache__/
