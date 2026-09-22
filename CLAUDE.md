@@ -312,6 +312,28 @@ measured claims) · `install-pi.sh` · `SETUP.md` (step-by-step Pi setup).
   stubs but have never hit the real endpoint. First real run is the first test — run `analyse.py`
   on day 1's frames, not on day 6's. Needs `pip install google-genai` and `GEMINI_API_KEY` in the
   environment, **never in the repo**.
+  - **EXERCISED AND PASSING** `[MEASURED, 22 Sep, on the Pi over SSH]`. Both schemas were accepted
+    by the real endpoint — **no `additionalProperties` 400**, which was the one API-boundary
+    failure the stubs could never catch. Both thinking budgets work: `medium` (−1, dynamic) on
+    `read_layout` and `low` (0, off) on `read_fills`. `read_layout` counted 4/4 trays on a
+    synthetic row. That risk is retired; what remains untested is the **recommendation call**,
+    which needs a real `daily.csv`.
+  - **THE MODEL'S OWN ERROR IS ~5 FILL-POINTS, AND IT IS NOT IN THE ±0.0 CLAIM**
+    `[MEASURED, 22 Sep]`. Against a synthetic row with known levels, `read_fills` scored MAE ≈5,
+    max 15, biased slightly LOW on mid-range trays; monotonic decline held in all four trays, the
+    one planted refill was detected (`refills=1`, none spurious elsewhere), and the tray that ran
+    out read `leftover_close=0` exactly. **But `leftover_close` is "±0.0 fill-points" only as a
+    SAMPLING property** — `design_checks.py` C6 measures the sampling chain on perfect readings.
+    End to end it carries the model's ~5–10 points on top. Do not let the PRD print ±0.0 as an
+    end-to-end accuracy; it is a statement about the 2-min gap, not about the vision. The
+    hand-coded audit day is what turns this into a defensible number.
+  - **The bounding boxes are NOT reliable image-pixel coordinates** `[MEASURED, 22 Sep]`. On the
+    synthetic row the four boxes were internally consistent but the aspect was wrong (returned
+    170×341 for trays that are 266×236). Harmless for the headline — `read_fills` never uses the
+    boxes, it is asked for N trays by index — but `dish_lab` crops with them for colour and
+    `report.py` crops the two photographs with them. **Check the boxes against day 1's real
+    frame** before trusting either; grounding is usually better on a photograph than on
+    synthetic shapes, but that is an assumption until looked at.
 - **She opens 08:00 and closes 19:00** `[T7, 22 Sep]` — an **11-hour** day, not the 6-hour
   lunch-only service every number in this repo was measured against until 22 Sep. Consequences:
   `install-pi.sh` has `CLOSE="20 19"` (USB mirror 19:20, shutdown 19:35); **~330 frames a day,
@@ -384,6 +406,15 @@ Live traps — do not re-litigate:
    15-way, 1 mm "standard" FPC. A CSI camera therefore needs a 22→15 adapter cable and a wait. **Use a
    USB webcam** — identical on both boards, and a 3 m USB extension keeps the Pi off a hot greasy
    counter where 50 cm of ribbon cannot.
+2b. **The webcam negotiates 640×480 unless told otherwise, and it offers 1920×1080**
+   `[MEASURED, 22 Sep, on the real device]`. `capture.py` took the driver default, which across
+   eight trays is **~80 px per tray against ~240 px** — and the fill read is the headline claim,
+   so it is the one thing that must not be starved of pixels. `open_cam()` now requests **MJPG
+   then 1920×1080** (1080p YUYV is ~62 MB/s and does not fit USB 2.0, so the driver would quietly
+   drop to a smaller mode), and `main()` **reads the size back off a real frame and logs it** —
+   `cap.set()` is a request on a UVC camera and no-ops silently, exactly like the white balance.
+   Knobs are `TW_W` / `TW_H`. **`TW_CROP` is in full-res pixels, so any crop chosen before this
+   change is meaningless** — always `--aim` after changing resolution.
 3. **Pi 5 caps total USB current at 600 mA** unless it detects a 5 A-capable USB-C PD supply. A 1080p
    webcam draws 150–250 mA so it fits, but an under-spec supply throttles and costs a day.
 4. **`RPi.GPIO` does not work on the Pi 5.** The RP1 chip replaced the hardware it talks to. Use

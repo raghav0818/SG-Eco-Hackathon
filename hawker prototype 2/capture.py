@@ -103,10 +103,23 @@ def next_seq(d):
 
 
 def open_cam():
+    """Ask for the SENSOR's resolution, not the driver's default.
+
+    The real webcam negotiates 640x480 unless told otherwise, though it offers
+    1920x1080. Across eight trays that is ~80px per tray against ~240px, and the
+    fill read is the headline claim -- it is the one thing that must not be
+    starved of pixels. MJPG first: 1080p YUYV is ~62 MB/s and does not fit USB 2.0,
+    so the driver would quietly fall back to a smaller mode or fail outright.
+
+    set() is a REQUEST on a UVC camera and silently no-ops (trap 5, same as white
+    balance), so main() reads the size back off a real frame and logs it."""
     import cv2
     cap = cv2.VideoCapture(DEV)
     if not cap.isOpened():
         return None
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  int(os.environ.get("TW_W", "1920")))
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(os.environ.get("TW_H", "1080")))
     for _ in range(5):
         cap.read()          # UVC cams hand back a stale dark frame or two on open
     return cap
@@ -133,6 +146,12 @@ def main():
 
     seq, cap, checked = next_seq(OUT), open_cam(), False
     print("capturing every %ds to %s, starting at seq %06d" % (EVERY, OUT, seq))
+    if cap is not None:
+        # Read the size back: set() is a request, not a guarantee. If this says
+        # 640x480 the camera refused the mode and every tray is ~80px wide.
+        print("camera negotiated %dx%d (asked %sx%s)"
+              % (cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+                 os.environ.get("TW_W", "1920"), os.environ.get("TW_H", "1080")))
     while True:
         t0 = time.monotonic()      # NOT time.time(): this file exists because the
                                    # clock gets STEPPED, and a backward step would

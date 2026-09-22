@@ -253,6 +253,19 @@ def main():
         json.dump(layout, open(LAYOUT, "w"), indent=1)
     boxes  = {t["tray"]: t["box"] for t in layout["trays"]}
     n      = len(boxes)
+    if n == 0:
+        # A zero-tray layout makes the `!= n` test below vacuously false for EVERY
+        # frame, so nothing is queued, no fill call is ever made, readings.csv is
+        # never written -- and this used to exit 0 announcing "wrote daily.csv".
+        # Confident fake success in the flattering direction, the same defect §5.5
+        # already carries one of. Delete the cache on the way out: otherwise the
+        # empty layout is reused forever and fixing the crop changes nothing.
+        os.remove(LAYOUT)
+        sys.exit("frame %s shows NO TRAYS, so nothing was read and no fill call was "
+                 "made. The crop probably does not contain the tray row: run "
+                 "`python3 capture.py --check` and look at check.jpg. layout.json "
+                 "has been deleted, so the next run asks again instead of silently "
+                 "re-reading the empty answer." % os.path.basename(frames[0]["path"]))
     print("frame 1 shows %d trays (READ off the frame, not configured)" % n)
 
     have, todo = cached_readings(), []
