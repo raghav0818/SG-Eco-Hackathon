@@ -38,6 +38,8 @@ python3 -c "import cv2" 2>/dev/null || {
 }
 
 echo "== 2. lock white balance and exposure, then VERIFY the lock took"
+# capture.py re-applies this on EVERY boot (UVC controls reset on re-enumeration).
+# This run is for immediate feedback -- you see below whether the lock takes at all.
 # CLAUDE.md trap 5: cap.set(CAP_PROP_AUTO_WB, 0) silently no-ops on many UVC cameras,
 # and a silent no-op loses the colour arm with no error. Set via v4l2-ctl, then read
 # back. Control names differ between kernels, so try both spellings and ignore misses.

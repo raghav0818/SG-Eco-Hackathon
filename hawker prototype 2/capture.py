@@ -54,6 +54,26 @@ def crop_box():
     return x, y, w, h
 
 
+def lock_wb(dev):
+    """Apply the lock on EVERY boot, not once at install time.
+
+    UVC control values live in the device, and they reset when it re-enumerates.
+    This Pi power-cycles nightly (shutdown cron 19:35, mains on at open), so
+    install-pi.sh's lock is good for day 1 and day 1 only -- days 2-6 would come up
+    with auto-WB back ON and honestly mark every row wb_locked=0. Five of six days
+    of the colour arm, lost silently to a power cycle.
+
+    Control names differ between cameras; try all three spellings and ignore misses.
+    This SETS, then wb_locked() below READS BACK -- never trust the setter (trap 5)."""
+    for c in ("white_balance_automatic=0", "white_balance_temperature_auto=0",
+              "auto_exposure=1"):
+        try:
+            subprocess.run(["v4l2-ctl", "-d", dev, "--set-ctrl", c],
+                           capture_output=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return                      # no v4l2-ctl: wb_locked() reports None
+
+
 def wb_locked(dev):
     """CLAUDE.md trap 5: `cap.set(CAP_PROP_AUTO_WB, 0)` silently no-ops on many UVC
     cameras. Ask the driver what actually stuck; never trust the setter. Returns
@@ -96,6 +116,7 @@ def main():
     import cv2
     x, y, w, h = crop_box()
     os.makedirs(OUT, exist_ok=True)
+    lock_wb(DEV)          # every boot, because the camera forgets
     locked = wb_locked(DEV)
     if locked is not True:
         print("WARNING: auto white balance is %s on %s. Capturing anyway -- the waste "

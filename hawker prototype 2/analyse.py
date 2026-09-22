@@ -130,7 +130,11 @@ LAYOUT_SCHEMA = {
         "grey_card": {"type": "array", "items": {"type": "integer"},
                       "minItems": 4, "maxItems": 4},
     },
-    "required": ["trays", "grey_card"],
+    # grey_card is NOT required: if no card is in frame the model must OMIT it,
+    # not point it at the greyest thing it can find. A stainless tray rim passes
+    # for a card, changes colour with the food in the tray, and would fill
+    # neighbour_contrast with plausible garbage and no error.
+    "required": ["trays"],
 }
 
 FILL_SCHEMA = {
@@ -151,8 +155,10 @@ def read_layout(client, path):
     return _ask(client, [_img(path),
         "This is a cai png stall's display tray row. Number the food trays 1..N from "
         "LEFT to RIGHT and give each one's bounding box as [x,y,width,height] in "
-        "pixels. Also give the bounding box of the printed grey reference card taped "
-        "in the row. Count only food trays; the grey card is not a tray."],
+        "pixels. Also give `grey_card`: the bounding box of the printed grey or white "
+        "reference card taped in the row. If there is NO such card, OMIT grey_card "
+        "entirely -- do not substitute a grey-looking object such as a tray rim or "
+        "the counter. Count only food trays; the card is not a tray."],
         LAYOUT_SCHEMA, effort="medium")
 
 
@@ -176,8 +182,9 @@ def dish_lab(path, box, card):
     im = cv2.imread(path).astype(np.float32) / 255.0
     cx, cy, cw, ch = card
     ref = im[cy:cy + ch, cx:cx + cw].reshape(-1, 3).mean(axis=0)
-    if (ref <= 0).any():
-        return None                                   # card in shadow: refuse to guess
+    if (ref <= 0).any() or (ref >= 0.99).any():
+        return None      # card in shadow, or blown out under the lamp: a saturated
+                         # channel has lost the ratio this normalisation needs.
     im = np.clip(im / ref * ref.mean(), 0, 1)         # per-channel white balance
     x, y, w, h = box
     crop = im[y:y + h, x:x + w]
@@ -335,7 +342,9 @@ def main():
             if t is None:
                 continue
             at = lambda i: samples[i][0] if i is not None else None
-            labs[tray] = dish_lab(fs[0]["path"], boxes[tray], layout["grey_card"])
+            card = layout.get("grey_card")
+            labs[tray] = (dish_lab(fs[0]["path"], boxes[tray], card) if card
+                          else None)   # no card -> blank contrast, never a guess
             dish, veg = (today or {}).get(tray, ("slot%d" % tray, ""))
             rows.append({
                 "day": day, "slot": tray, "dish": dish, "is_veg": int(veg) if veg != "" else "",
@@ -416,6 +425,8 @@ def selftest():
     assert t["sold_out_i"] == next(i for i, v in enumerate(t["levels"]) if v <= 0)
     assert de([0, 0, 0], [0, 3, 4]) == 5.0
     assert de(None, [0, 0, 0]) is None                      # a missing colour is not 0
+    # A card the model was FORCED to return is worse than no colour arm at all.
+    assert "grey_card" not in LAYOUT_SCHEMA["required"]
 
     # Gemini's response_schema is an OpenAPI 3.0 subset and REJECTS
     # additionalProperties with a 400. This is the one failure the stubs cannot catch,
