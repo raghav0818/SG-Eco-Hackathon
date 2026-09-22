@@ -3,8 +3,10 @@
 prints what the kitchen board would have shown. This is the 2 Oct demo, and it is the
 only honest way to show 60 meals when you have no camp access.
 
-Ledger rows: date,confirmed_eating,unconfirmed,actual_demand
+Ledger rows: date,confirmed_eating,unconfirmed,actual_demand[,declined]
   (demand = what people would have taken if nothing ran out)
+  (declined = voted "Not eating".  Optional 5th column, defaults to 0, so a ledger
+   written before the ceiling ratchet existed still replays.)
 Real rows if the food IC gives you any; otherwise --synth, and SAY SO ON THE SLIDE.
 
 Two numbers are reported, deliberately:
@@ -24,20 +26,21 @@ def rows(path=None, n=60, seed=3, p=0.72):
     p is [ASSUMED] and must be labelled so."""
     if path:
         for d in csv.reader(open(path)):
-            yield d[0], int(d[1]), int(d[2]), int(d[3])
+            yield d[0], int(d[1]), int(d[2]), int(d[3]), int(d[4]) if len(d) > 4 else 0
         return
     rng = random.Random(seed)
     for i in range(n):
         C = rng.randint(55, 65)
         U = rng.randint(30, 45)
-        yield "m%02d" % i, C, U, C + sum(rng.random() < p for _ in range(U))
+        N = rng.randint(8, 14)                 # voted "Not eating"
+        yield "m%02d" % i, C, U, C + sum(rng.random() < p for _ in range(U)), N
 
 
 def run(src, s):
     """One meal loop for main() and demo(). Yields BEFORE scoring, so s["r"] is still
     what the board showed. ponytail: break out early and the last meal goes unscored."""
-    for d, C, U, dem in src:
-        cooked = F.cook(s, C, U)
+    for d, C, U, dem, N in src:
+        cooked = F.cook(s, C, U, N)
         taken  = min(dem, cooked)
         yield d, C, U, cooked, taken, dem > cooked
         F.score(s, C, U, cooked, cooked - taken)
@@ -58,7 +61,8 @@ def main(path=None):
 
     n = len(hist)
     FMT = "  %-16s %8d%8d%9d (%4.1f%%)%9d"
-    print("\n%d meals, r = 1.00 -> %.2f, margin now %d portions.\n" % (n, s["r"], F.margin(s)))
+    print("\n%d meals, r = 1.00 -> %.2f, margin now %d portions, ceiling slack %d.\n"
+          % (n, s["r"], F.margin(s), s["slack"]))
     print("                     indent   Chope   not cooked        ran short")
     print(FMT % (("cumulative",) + block(hist)))
     print(FMT % (("steady state",) + block(hist[WARMUP:])) + "   <- the ongoing rate")
@@ -71,13 +75,19 @@ def main(path=None):
 
 
 def demo():
-    """Self-check: the harness must not flatter the design."""
-    s = F.new()
-    hist = [(C + U, cooked, short)
-            for _, C, U, cooked, _, short in run(rows(seed=11), s)]
+    """Self-check: the harness must not flatter the design.  Across SEEDS runs, not
+    one -- a shortfall rate measured on 40 meals of a single seed is noise, and an
+    assertion on noise passes or fails for the wrong reason."""
+    SEEDS = 8
+    warm, steady = [], []
+    for sd in range(SEEDS):
+        s = F.new()
+        h = [(C + U, cooked, short)
+             for _, C, U, cooked, _, short in run(rows(seed=100 + sd), s)]
+        warm += h[:WARMUP]; steady += h[WARMUP:]
 
-    warm, steady = hist[:WARMUP], hist[WARMUP:]
     pct = lambda rs: 100.0 * sum(b - k for b, k, _ in rs) / sum(b for b, _, _ in rs)
+    short = lambda rs: 100.0 * sum(x for _, _, x in rs) / len(rs)
 
     # the warm-up really does cost something -- if it doesn't, the baseline is wrong
     assert pct(warm) < pct(steady), (pct(warm), pct(steady))
@@ -86,10 +96,10 @@ def demo():
     # larger prize is the unmeasured kitchen buffer on top, which this cannot see.
     # If this ever reads >8%, the margin has been tuned unsafe -- check shortfalls.
     assert 3.0 < pct(steady) < 8.0, pct(steady)
-    # and it must not be bought with shortfalls
-    assert sum(x for _, _, x in steady) <= 1, sum(x for _, _, x in steady)
-    print("ok  |  warm-up %.1f%%, steady %.1f%%, shortfalls in steady state %d"
-          % (pct(warm), pct(steady), sum(x for _, _, x in steady)))
+    # and it must not be bought with shortfalls: the design target is under 2.5%
+    assert short(steady) < 2.5, short(steady)
+    print("ok  |  %d x 60 meals: warm-up %.1f%%, steady %.1f%%, %.1f%% of steady "
+          "meals ran short" % (SEEDS, pct(warm), pct(steady), short(steady)))
 
 
 if __name__ == "__main__":
