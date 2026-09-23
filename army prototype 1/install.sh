@@ -76,6 +76,24 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now chope-keypad.service
 
+echo "== 4b. listener service (/commands, /demo) -- outbound long-poll, no open port"
+sudo tee /etc/systemd/system/chope-listen.service >/dev/null <<EOF
+[Unit]
+Description=Chope listener (/leaderboard, /demo ...)
+Wants=network-online.target
+After=network-online.target
+[Service]
+EnvironmentFile=/etc/chope.env
+WorkingDirectory=$HERE
+ExecStart=/usr/bin/python3 "$HERE/chope.py" listen
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now chope-listen.service
+
 echo "== 5. kiosk board on HDMI"
 URL=$(printf 'file://%s/board.html' "$HERE" | sed 's/ /%20/g')   # "army prototype 1"
 BIN=chromium-browser
@@ -108,6 +126,8 @@ echo "  Two numbers, not one, and the first one is the pan -- not the board. The
 echo "  kitchen cooks above whatever number it is given [T5], so scoring the meal"
 echo "  against the board makes r collapse from 0.72 to 0.42 with no visible error."
 echo "  The screen tells the operator which number it wants."
-echo "  5.  python3 replay.py                               # the 2 Oct demo, no Telegram needed"
+echo "  5.  in the group: /demo  (vote, key cooked+left on the numpad)  or  /demo auto"
+echo "      /demo reset between visitors.  Logs: journalctl -u chope-listen -f"
+echo "  6.  python3 replay.py                               # 60 meals, no Telegram needed"
 echo
 echo "cook cutoff is currently $LOCK_AT -- edit LOCK_AT at the top and re-run."

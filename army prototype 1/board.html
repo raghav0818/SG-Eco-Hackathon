@@ -191,13 +191,14 @@ if (typeof B === 'undefined') {
       var now = new Date();
       var parts = B.cutoff.split(':');
       var cutoff = new Date(now);
-      cutoff.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+      cutoff.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2] || 0, 10), 0);
       var remain = Math.max(0, cutoff - now);           // clamp at 0: never claim "tomorrow"
       var h = String(Math.floor(remain / 3600000)).padStart(2, '0');
       var m = String(Math.floor(remain / 60000) % 60).padStart(2, '0');
       var s = String(Math.floor(remain / 1000) % 60).padStart(2, '0');
       ringVal.textContent = h + ':' + m + ':' + s;
       var open_ = new Date(now); open_.setHours(7, 0, 0, 0);   // matches install.sh's OPEN_AT
+      if (B.opened) open_ = new Date(B.opened * 1000);          // /demo: a 45 s poll
       var total = Math.max(1, cutoff - open_);
       var frac = Math.max(0, Math.min(1, remain / total));
       ringProg.style.strokeDashoffset = CIRC * (1 - frac);

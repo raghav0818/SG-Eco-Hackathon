@@ -88,9 +88,12 @@ everything needed is already owned.** Core code **written and passing its self-c
   "never names" a promise about our code. `is_anonymous=true` makes it **a property of Telegram's
   servers**: no user id has any path to the Pi, and Telegram dedups server-side. ~9 lines instead of
   ~80. **Price: "Same as last week" is per-person state and is cut.**
-- **No update loop at all.** Webhook needs an inbound port (impossible, and a listening socket on a
-  defence network is a conversation to avoid); `getUpdates` needs none — but neither is required,
-  because `stopPoll` *returns* the final counts. Three outbound POSTs on cron, no daemon.
+- **The forecast needs no update loop** — `stopPoll` *returns* the final counts, three outbound
+  POSTs on cron. **Since 23 Sep there IS one, for the game only:** `chope.py listen` long-polls
+  `getUpdates` (outbound, still no port — never a webhook) to answer `/leaderboard`, `/demo` etc.
+  Votes stay anonymous; a command arrives with `from.id`, which is read past and never stored.
+  Game rules, option B (most Goal Days wins the monthly special), and the demo seeding are in
+  `army prototype 1/13-chope-fun-bot-decisions.md`; code in `game.py`.
 - At the cook cutoff the board locks **`COOK = min(cap, base + margin)`**, where
   `base = confirmed + ceil(r × unconfirmed)` and `cap = confirmed + unconfirmed + min(slack,
   declined)`. **The bound is the claim, not the estimator.** Three properties hold for every input

@@ -4,6 +4,7 @@
 chope_state.json
 meals.csv
 board.js
+units.json
 *.tmp
 __pycache__/
 
