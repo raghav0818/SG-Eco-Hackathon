@@ -6,3 +6,6 @@ meals.csv
 board.js
 *.tmp
 __pycache__/
+
+# Tray Watch rehearsal output -- synthetic, never a deliverable
+hawker prototype 2/demo/

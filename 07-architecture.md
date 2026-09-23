@@ -408,6 +408,27 @@ the filter changed the data, the answer is a column diff, not a shrug.
 
 ## 5.5 The statistics — the unit of analysis is the dish, not the dish-day
 
+> ### ⚠ CORRECTED 21 Sep. This section retired the day-level test for a floor p of 0.10 — and then
+> ### made the same mistake one level down. Read this box before the section below it.
+>
+> **The "n = 8 dishes, floor p = 0.0078" claim below is wrong.** A dish that MOVED has position
+> confounded with contrast, so only **never-moved, re-neighboured** dishes carry contrast
+> information. Exhaustive over all 40,320 rearrangements of an 8-tray row `[MEASURED, 21 Sep]`:
+>
+> | trays | max never-moved AND re-neighboured | best possible p | |
+> |---|---|---|---|
+> | 8 | **5** | **0.0625** | **above 0.05 — unwinnable at any outcome** |
+> | 9 | 6 | 0.0312 | winnable in principle |
+>
+> Shuffling a row of 8 always costs three dishes as movers. **And at n=8, ignoring that, the test
+> detects a real +10% effect 10% of the time and a real +20% effect 30% of the time.**
+>
+> **Consequence:** the rearrangement is a *side arm* reporting an effect size and CI, never a
+> p-value, and the prototype leads with the waste ledger instead. `hawker prototype 2/design_checks.py`
+> proves all of it in ~30 s; `09-traywatch-prd.md` §"What six days can and cannot prove" carries the
+> rebuilt argument. **The maths below is retained because it is correct maths on the wrong n** — and
+> because a retired claim that quietly vanishes is how the first version of this mistake survived.
+
 **The plan's headline analysis is weaker than it looks, and this changes it.**
 
 `05` §3.4 proposes `served_total ~ neighbour_contrast + dish fixed effects` across 48 dish-days. On
@@ -437,15 +458,31 @@ from itertools import product
 d    = pd.read_csv("daily.csv")
 piv  = d.pivot_table(index="dish", columns="arrangement",
                      values="served_total", aggfunc="median")
-diff = (piv["contrast"] - piv["baseline"]).values        # 8 within-dish differences
+diff = piv["contrast"] - piv["baseline"]                 # one per dish
+
+# A cai png roster rotates. A dish that missed an arrangement arm gives NaN, and the
+# UNGUARDED version of this reported p = 0.0000 -- PERFECT significance out of a hole,
+# because abs(null) >= abs(nan) is all-False. Drop them BY NAME, loudly, and refuse to
+# run when too few are left to reach 0.05 at all.  [MEASURED, 21 Sep: design_checks.py C3]
+dropped = diff[diff.isna()].index.tolist()
+if dropped:
+    print(f"DROPPED {len(dropped)} dish(es) missing an arrangement arm: {dropped}")
+diff = diff.dropna().values
+n    = len(diff)
+assert n >= 6, (f"only {n} complete dishes; floor p = {2/2**n:.4f} > 0.05, so this test "
+                f"cannot reach significance whatever the data says. Report the effect "
+                f"size and CI instead -- see design_checks.py C1.")
 
 obs  = diff.mean()
-null = np.array([(s * np.abs(diff)).mean() for s in product([-1, 1], repeat=8)])
+null = np.array([(s * np.abs(diff)).mean() for s in product([-1, 1], repeat=n)])
 p    = float(np.mean(np.abs(null) >= abs(obs)))          # exact, two-sided
 
-assert len(null) == 256 and p >= 2/256
-print(f"mean within-dish difference = {obs:+.1f} fill-points, exact p = {p:.4f}")
+assert len(null) == 2**n and p >= 2/2**n and not np.isnan(p)
+print(f"mean within-dish difference = {obs:+.1f} fill-points over n={n}, exact p = {p:.4f}")
 ```
+
+**Even when this runs clean, it is reported as exploratory.** At the n this design can actually
+reach, the p-value is not the claim — the effect size and its interval are.
 
 | | Floor p | Can it reach 0.05? |
 |---|---|---|

@@ -15,7 +15,7 @@
 
 I need to build a simple yet robust MVP for **closing the feedback loop between a cookhouse bin and the forecast that filled it** targeting **outsourced institutional catering — SAF cookhouses as the beachhead, and any closed population where meals are declared ahead and someone cooks to a forecast**. This will primarily solve **the fact that nobody ever tells the kitchen how much food came back, so the over-provision that causes the waste is invisible to every person in a position to reduce it** and our main competitive advantage is **every incumbent points a camera at the bin and measures the loss after it is irreversible; this measures the forecast before the food is cooked — and it works in an environment where a camera is not deployable at all.**
 
-The core functionality should handle **posting one anonymous poll into a unit's existing Telegram group, locking a cook number at the cutoff as `confirmed + r × unconfirmed + margin`, displaying that number on a kitchen screen, accepting a single "portions left" figure on a numeric keypad after service, and using `taken = cooked − left` to score the forecast and update `r` — permanently, meal after meal.**
+The core functionality should handle **posting one anonymous poll into a unit's existing Telegram group, locking a cook number at the cutoff as `min(confirmed + unconfirmed, confirmed + r × unconfirmed + margin)`, displaying that number on a kitchen screen, accepting **two** figures on a numeric keypad after service — what was *actually cooked*, then what was *left* — and using `taken = actual_cooked − left` to score the forecast and update `r` — permanently, meal after meal.**
 
 ---
 
@@ -67,10 +67,11 @@ personal data, and it is the only one that could be installed in a Green Zone at
 |---|---|---|
 | F1 | Post one anonymous two-option poll into the unit's existing Telegram group | **no** |
 | F2 | Close the poll at the cook cutoff and read back aggregate counts only | **no** |
-| F3 | Lock and display `COOK = confirmed + r × unconfirmed + margin` on a kitchen screen | **no** |
+| F3 | Lock and display `COOK = min(confirmed + unconfirmed, confirmed + r × unconfirmed + margin)` on a kitchen screen | **no** |
 | F4 | Accept one integer — portions left — on a USB numeric keypad after service | **no** |
 | F5 | Score the forecast: `taken = cooked − left`, append to `meals.csv` | **no** |
 | F6 | Update `r` (EWMA) and the safety margin (separate EWMA on absolute error) | **no** |
+| F6b | Log `buffer_pct = actual_cooked ÷ board` every meal — **this is K1**, the number nobody in the SAF has | **no** |
 | F7 | Ratchet `r` upward only on a stock-out — censored observation | **no** |
 | F8 | Replay a meal ledger to demonstrate the loop where no deployment is possible | **no** |
 
@@ -207,11 +208,117 @@ self-checks could have caught:**
 | 2 | The page used `fetch()` on a `file://` URL | **Chromium blocks XHR on `file://`.** The board would have read `no data` forever — on the demo table, on 2 Oct. Now the page is a `<script src="board.js">` plus a 5 s meta refresh: no fetch, no server, no listening socket |
 | 3 | `forecast.py` defaulted `CHOPE_STATE` to a **relative** path | Under cron and systemd the CWD is `/`. The state file would have been written somewhere else, `load()` would have silently returned `new()`, and **`r` would have reset to 1.0 every run** — the forecast quietly reverting to today's number with no error anywhere |
 | 4 | `keypad.py` spawned `"chope.py"` by relative path | Same root cause as 3. The keypad would have done nothing under systemd |
+| 5 | The margin had a **flat floor of 3 portions** and `cook()` had **no upper bound at all** | A group of one who answered *"not eating"* was told to cook **3**. The same defect at full scale told a 90-man lunch to cook for 93 people who do not exist. A number a judge can break in one sentence is worth nothing, however good the estimator behind it is |
+| 6 | `R_FLOOR = 0.50` floored `r` regardless of evidence | **34 wasted portions a meal** in a unit where silence mostly means "not eating" — twelve times the entire saving, invisible, and dressed as a safety feature |
+| 7 | A **hard** cap at `confirmed + unconfirmed`, with no release | If decliners ever turn up, the system converges to failing **97% of meals while reporting zero forecast error** — and it is *high* poll reply rates that trigger it, i.e. Chope working |
+| 8 | `slack` clamped at use but never written back | A ceiling learned on a 40-decliner lunch lay dormant and sprang back on a later meal |
+| 9 | A meal where **nothing** was cooked has `left == 0` by arithmetic | It was read as a stock-out, manufacturing ceiling evidence out of an empty pan |
+| 10 | The keypad took **one** number, and the meal was scored against the **board's** number | `[T5]` the kitchen cooks ~10% above whatever it is given, so `left` was measured against a pan 10% bigger than the one in the sum. `taken` read 10% low every meal, **`r` collapsed from 0.72 to 0.42 (measured; 0.21 at a 20% buffer)** — and it could never be noticed, because the kitchen's own buffer covered the shortfall the error caused. Two numbers now, and the first one *is* the K1 instrument |
 
 **And two guards added**, because both failures are silent and both destroy a meal's data:
 `lock` and `left` now refuse a board written on a different day, and `left` refuses a board that
 is not in the `cook` state. A morning where the poll failed to post used to leave yesterday's
 numbers in place and score today's meal against them.
+
+### The number is bounded, and that — not the estimator — is the claim
+
+```
+base = confirmed + ceil(r × unconfirmed)            r ≤ 1, so base ≤ cap
+cap  = confirmed + unconfirmed + min(slack, declined)            ≤ strength
+COOK = min(cap, base + margin)
+```
+
+Three properties hold **for every input and every internal state**, and `forecast.py`'s self-check
+proves them by fuzzing 4,000 random states rather than asserting them on one flattering example:
+
+1. **`confirmed ≤ COOK ≤ strength`.** Both bounds are counts anyone in the room reads straight off
+   the poll, so the number is checkable *without trusting the model at all*.
+2. **One more "Eating" vote never lowers COOK. One more "Not eating" never raises it.** The board
+   cannot move the wrong way. This is the property a sceptic actually reaches for.
+3. **Nobody who declined is cooked for** — unless decliners have actually turned up before, and
+   then only by as many portions as turned up.
+
+The slide line:
+
+> **We never cook for someone who told us they aren't coming, and we never leave out someone who
+> told us they are.** Everything the model does happens strictly between two numbers you can count.
+
+The degenerate cases stop being special cases — they fall out of the arithmetic:
+
+| eat | not eating | silent | COOK | why |
+|---|---|---|---|---|
+| 0 | 1 | 0 | **0** | one man, he said no. Cook nothing. *(was 3)* |
+| 0 | 0 | 1 | **1** | one man, silent. Silence counts as eating, as it does today |
+| 2 | 8 | 0 | **2** | everybody answered; nothing left to estimate *(was 38 with a stale margin)* |
+| 0 | 0 | 40 | **40** | nobody answered; exactly today's indent |
+| 60 | 12 | 28 | **88** | the live case: `r` and the margin do their work inside the 28 |
+
+**Three pieces of state, each moved only by its own evidence — and none of them a tuned constant:**
+
+| | what it estimates | what moves it |
+|---|---|---|
+| `r` | what fraction of the **silent** eat | EWMA of observed turn-up, α = 0.25 |
+| `margin` | how **noisy** the forecast is | EWMA of abs(error); ≈ 1.6 σ at `MARGIN_K = 2.0` |
+| `slack` | how wrong the **ceiling** is | ratchets only on a stock-out that happened *while already cooking for everyone who did not decline* |
+
+#### Why there is a ceiling ratchet at all, given decliners *don't* turn up
+
+`[T5, 20 Sep]`: *"assume no. if not eating means they have plan already, so very high chance that
+they are not eating."* Measured against that answer, **`slack` stays at exactly 0 in every
+realistic regime** — 20 runs × 60 meals at the replay's reply rate, and at 30%, 70% and 95%. The
+valve costs literally nothing to carry.
+
+It stays anyway, and this is the argument: it guards the **only assumption in the design that is
+about human behaviour rather than arithmetic**, Chope is explicitly not an SAF-only product
+(nursing homes, hostels, boarding schools — where "not eating" may well mean something softer), and
+the failure it prevents is silent. A hard cap is correct only if a "Not eating" vote is never
+wrong. If
+even 10% of decliners turn up, a hard cap fails — and it fails **worst exactly where Chope is
+trying to go.** Measured, 300 meals, 100-man unit, 10% of decliners turning up:
+
+| poll reply rate | hard cap: meals short | hard cap: `err` reports | with the ratchet |
+|---|---|---|---|
+| 30% | 3.7% | 3.0 | 3.7% |
+| 70% | 3.0% | 4.7 | 3.0% |
+| 95% | **81.7%** | 2.3 | **10.7%** |
+| 100% | **97.3%** | **0.0** | **5.0%** |
+
+Read the 100% row twice. With a hard cap the system **fails 97% of meals while reporting zero
+forecast error.** When the cap binds, `cooked == base`, so the measured error `abs(taken − base)` is
+identically zero however short you were — and with nobody silent, the stock-out branch was never
+even reached. **Chope's own Half A success is what detonates it:** the better the poll adoption, the
+smaller the silent pool, the harder the ceiling bites. The ratchet is the release valve, and it
+costs nothing when decliners never turn up — `slack` stays at 0 at every reply rate in the control.
+
+#### Two constants deleted, both of them floors on waste
+
+| deleted | what it did | measured cost |
+|---|---|---|
+| `MARGIN_MIN = 3` — a flat margin floor | told a group of one who declined to cook **3**; told a 90-man lunch to cook for **93 people who do not exist** | 3 portions every meal, buying no safety — on meals that genuinely run short the shortfall is far bigger than 3 |
+| `R_FLOOR = 0.50` — *"never trust fewer than half the silent"* | floored `r` at 0.5 regardless of evidence | in a unit where silence mostly means "not eating": **34 wasted portions a meal at p = 0.15, 29.5 at p = 0.25, 13.9 at p = 0.40** — against ~6 with no floor, and **twelve times Chope's entire saving** |
+
+Deleting `R_FLOOR` costs exactly **one extra tight meal per regime shift** — 4 short meals in the 12
+after a block leave, against 3 with the floor. That is the whole downside, and it is bought back
+inside a fortnight of normal service. **Do not add a third constant of this species.**
+
+#### What is deliberately *not* fixed, and what it costs
+
+- **One keypad number cannot tell "ran out" from "exactly right."** Both leave `left == 0`. So a
+  perfect forecast is scored as a stock-out and the ceiling creeps up. **Measured residual: exactly
+  1 portion, at 10 men and at 500** — it does not scale with unit size. That is the entire price of
+  the three-keystroke UX, and it is paid in the safe direction.
+- **`err` tracks `abs(taken − base)`, which equals `abs(margin − left)`.** That is a real forecast
+  error only while `left` moves with real demand. If the kitchen reports leftovers against a pan
+  other than the one keyed in, the margin feeds on its own leftovers and runs away upward.
+  **Watch `left` in week one.**
+- **SBAB serves no dinner; lunch only** `[T5, 20 Sep]`, so one state file and five meals a week.
+  `CHOPE_STATE` stays an environment variable, so a camp that serves two meals gets a second cron
+  line and no code change — a single `r` across lunch and dinner would oscillate between two
+  genuinely different turn-up rates.
+- **No day-of-week term.** Monday and Friday do differ, but one meal per weekday gives one sample
+  per bucket per week — seven EWMAs learning seven times slower, and it is exactly the
+  training-set-shaped thing this project deliberately does not build. α = 0.25 has a ~7-meal
+  window, so it *tracks* weekly drift even though it cannot *anticipate* it.
 
 ---
 
@@ -227,27 +334,42 @@ matters is a missed cutoff, and the fallback is that the kitchen cooks exactly w
 
 | | vs. the indent | ran short |
 |---|---|---|
-| Cumulative, including the learning period | **1.8%** | 1 |
-| **Steady state, after `r` converged** | **2.7%** | 1 |
+| Cumulative, including the learning period | **4.0%** | 2.4% of meals |
+| **Steady state, after `r` converged** | **4.8%** | 2.1% of meals |
+
+*(20 runs × 60 meals, not one seed — a shortfall rate measured on 40 meals of a single run is
+noise, and the old self-check asserted on exactly that.)*
 
 **Both figures go on the slide, and the small one goes first.** The cumulative number includes the
 period when `r` is still near 1.0 and Chope deliberately cooks *more* than today. That cost is real.
 
 **Two things that make the modest number honest rather than disappointing:**
 
-1. **The baseline is the indent only.** The kitchen then cooks *above* the indent on top of that —
-   *"if you input 100 they will cook more than 100"* `[T2]`. **That buffer is K1, it is unmeasured, and
-   nobody in the SAF knows it.** So 2.7% understates the saving by an unknown factor.
+1. **The buffer is multiplicative, so the percentage is exactly right — and the real prize is
+   bigger than the forecast.** `[T5, 20 Sep]`: *"if you put 100, they will cook 110. smth like
+   that."* A ~×1.10 buffer scales today's cooking and Chope's alike, so 4.8% is the honest
+   percentage and only the absolute portion count is 10% larger than the replay prints. **But a
+   10% buffer against a 4.8% forecast saving means the buffer is worth more than twice the
+   forecast.** Half B is literally the bigger half. The pitch is not *"we forecast better"* — it
+   is: *the kitchen keeps a 10% buffer because being short is loud and being over is silent, and
+   it has never once been shown how accurate the number it is given actually is. Chope shows it,
+   every lunch, in the kitchen's own handwriting.* 10% → 3% is a further ~7% on top, and **nothing
+   else in this project can produce that evidence.**
 2. **The safety margin eats roughly half the gain, on purpose.** That trade is the design, and it is
    tunable. The table below is the most credible artifact the prototype has, because it shows the
    design admitting its own cost instead of quoting one flattering number:
 
 | `MARGIN_K` | portions not cooked | stock-outs per 80 meals |
 |---|---|---|
-| 1.0 | 6.6% | 5.2 |
-| 1.5 | 5.6% | 3.5 |
-| **2.0 — shipped** | **4.6%** | **2.0** |
-| 2.5 | 3.5% | 0.8 |
+| 1.0 | 6.9% | 5.8 |
+| 1.5 | 5.7% | 3.0 |
+| **2.0 — shipped** | **4.8%** | **1.7** |
+| 2.5 | 3.8% | 1.2 |
+| 3.0 | 2.9% | 0.6 |
+
+*(20 runs × 60 meals each, so one lucky seed cannot pick the shipped row. `MARGIN_K` has a clean
+reading: the margin is ≈ 0.8 × K standard deviations of cover, so 2.0 ≈ 1.6 σ. Held against
+turn-up rates from 0.25 to 0.90 the worst case is 2.3% of meals short — inside the 2.5% target.)*
 
 ---
 

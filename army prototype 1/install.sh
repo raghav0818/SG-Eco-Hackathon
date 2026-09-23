@@ -28,6 +28,12 @@ fi
 sudo chmod 600 /etc/chope.env
 sudo chown root:root /etc/chope.env
 
+# CHOPE_CUTOFF drives the open-screen countdown ring -- keep it derived from LOCK_AT,
+# not typed separately, so editing LOCK_AT and re-running is the only place to change it.
+CUTOFF_HHMM=$(set -- $LOCK_AT; printf '%02d:%02d' "$2" "$1")
+sudo sed -i '/^CHOPE_CUTOFF=/d' /etc/chope.env
+printf 'CHOPE_CUTOFF=%s\n' "$CUTOFF_HHMM" | sudo tee -a /etc/chope.env >/dev/null
+
 echo "== 3. cron (root's, because only root can read the token)"
 # The clock is right (NTP) but the TIMEZONE may not be. Pi OS Imager defaults to
 # Europe/London unless you changed it -- cron would then fire "0 7" at 3pm SGT and
@@ -57,7 +63,7 @@ rm -f "$CRON_"
 echo "== 4. keypad service"
 sudo tee /etc/systemd/system/chope-keypad.service >/dev/null <<EOF
 [Unit]
-Description=Chope keypad (portions left)
+Description=Chope keypad (cooked, then portions left)
 [Service]
 EnvironmentFile=/etc/chope.env
 WorkingDirectory=$HERE
@@ -95,7 +101,13 @@ echo "installed for user $USER_, code in $HERE"
 echo "next, in order:"
 echo "  1.  sudo sh -c 'set -a; . /etc/chope.env; set +a; python3 chope.py check'  # proves the token -- /etc/chope.env is root-only"
 echo "  2.  sudo reboot                                     # board should come up on HDMI"
-echo "  3.  type a number on the keypad + Enter             # only valid after a 'lock'"
-echo "  4.  python3 replay.py                               # the 2 Oct demo, no Telegram needed"
+echo "  3.  keypad: how many were ACTUALLY cooked + Enter  # only valid after a 'lock'"
+echo "  4.  keypad: how many portions are left + Enter"
+echo ""
+echo "  Two numbers, not one, and the first one is the pan -- not the board. The"
+echo "  kitchen cooks above whatever number it is given [T5], so scoring the meal"
+echo "  against the board makes r collapse from 0.72 to 0.42 with no visible error."
+echo "  The screen tells the operator which number it wants."
+echo "  5.  python3 replay.py                               # the 2 Oct demo, no Telegram needed"
 echo
 echo "cook cutoff is currently $LOCK_AT -- edit LOCK_AT at the top and re-run."

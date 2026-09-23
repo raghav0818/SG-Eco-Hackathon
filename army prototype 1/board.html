@@ -1,23 +1,208 @@
 <!doctype html><meta charset="utf-8"><title>Chope</title>
 <meta http-equiv="refresh" content="5">
-<style>
-  body{margin:0;height:100vh;display:flex;flex-direction:column;justify-content:center;
-       align-items:center;background:#000;color:#fff;font:600 1rem/1.1 system-ui,sans-serif}
-  #n{font-size:34vw;letter-spacing:-.03em}
-  #l{font-size:4vw;opacity:.55;text-transform:uppercase;letter-spacing:.35em}
-  #s{position:fixed;bottom:3vh;font-size:2.4vw;opacity:.45;text-align:center}
-</style>
-<div id="l">chope</div><div id="n">--</div><div id="s">no data yet</div>
 <!-- board.js is written by chope.py as  B={...}  . The meta refresh above re-reads it
-     from disk every 5 s. No fetch (Chromium blocks XHR on file://), no server, no timer. -->
+     from disk every 5 s. No fetch (Chromium blocks XHR on file://), no server, no
+     listening socket. Fonts are self-hosted in fonts/ for the same reason: the
+     kitchen half of Chope must render with the Pi's network down. -->
+<style>
+  @font-face{font-family:"Anton";font-style:normal;font-weight:400;font-display:swap;
+    src:url("fonts/anton.woff2") format("woff2")}
+  @font-face{font-family:"Archivo Narrow";font-style:normal;font-weight:500 700;font-display:swap;
+    src:url("fonts/archivo-narrow.woff2") format("woff2")}
+  @font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400 700;font-display:swap;
+    src:url("fonts/jetbrains-mono.woff2") format("woff2")}
+
+  :root{
+    --navy:#1a2e35; --navy-2:#244855; --rust:#874F41; --sage:#90AEAD;
+    --orange:#E64833; --cream:#FBE9D0; --cream-dim:#c9bda6; --void:#0d1416;
+    --font-poster:"Anton",Impact,sans-serif;
+    --font-cap:"Archivo Narrow",Arial Narrow,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--void)}
+  body{font-family:var(--font-mono)}
+
+  .brand{position:fixed;top:2.2vh;left:2.2vw;display:flex;align-items:center;gap:.6vw;z-index:2}
+  .brand .badge{width:1.1vw;height:1.1vw;min-width:11px;min-height:11px;border-radius:50%;
+    border:1.5px dashed var(--orange);position:relative}
+  .brand .badge::after{content:"";position:absolute;inset:28%;background:var(--orange);border-radius:50%}
+  .brand .name{font-family:var(--font-cap);font-weight:700;font-size:clamp(.7rem,1.1vw,1rem);
+    letter-spacing:.34em;text-transform:uppercase;color:var(--cream-dim);opacity:.65}
+
+  .screen{position:fixed;inset:0;
+    background:linear-gradient(190deg,var(--navy-2) 0%,var(--navy) 55%,#150e0c 130%);
+    display:flex}
+  .grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:overlay;pointer-events:none}
+
+  .view{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center}
+  .screen[data-state="open"]   .view-open{display:flex}
+  .screen[data-state="cook"]   .view-cook{display:flex;background:var(--navy)}
+  .screen[data-state="cooked"] .view-cooked{display:flex;background:var(--navy)}
+  .screen[data-state="done"]   .view-done{display:flex;background:var(--navy)}
+
+  .chip{position:fixed;top:2.2vh;left:50%;transform:translateX(-50%);z-index:2;
+    font-family:var(--font-cap);font-weight:700;font-size:clamp(.7rem,1vw,.95rem);
+    letter-spacing:.2em;text-transform:uppercase;color:var(--orange);
+    border:1px solid rgba(230,72,51,.45);background:rgba(230,72,51,.1);
+    padding:.5vh 1.2vw .4vh;border-radius:2px}
+  .timestamp{position:fixed;top:2.2vh;right:2.2vw;z-index:2;
+    font-size:clamp(.65rem,.9vw,.85rem);color:var(--cream-dim);opacity:.6;letter-spacing:.06em}
+
+  /* ===== OPEN — nothing to do yet, so say exactly when there will be ===== */
+  .ring-box{position:relative;width:clamp(220px,30vw,420px);height:clamp(220px,30vw,420px)}
+  .ring{width:100%;height:100%}
+  .ring circle{fill:none}
+  .ring .track{stroke:rgba(251,233,208,.14);stroke-width:2.4}
+  .ring .prog{stroke:var(--orange);stroke-width:2.4;stroke-linecap:round;
+    transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .3s linear}
+  .ring-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:.8vh}
+  .ring-value{font-variant-numeric:tabular-nums;color:var(--cream);font-size:clamp(1.8rem,5vw,3.4rem);font-weight:600}
+  .ring-cap{font-family:var(--font-cap);font-weight:600;font-size:clamp(.7rem,1.3vw,1rem);
+    letter-spacing:.24em;text-transform:uppercase;color:var(--sage)}
+
+  /* ===== COOK — the one number, undecorated ===== */
+  .hero{font-family:var(--font-poster);color:var(--cream);font-size:clamp(6rem,24vw,30rem);line-height:.86}
+  .hero-label{font-family:var(--font-cap);font-weight:700;font-size:clamp(1rem,2.2vw,2.2rem);
+    letter-spacing:.6em;text-transform:uppercase;color:var(--orange);margin-top:-.15em}
+  .stats{display:flex;gap:clamp(24px,5vw,90px);margin-top:clamp(20px,4vh,56px)}
+  .stat{text-align:center}
+  .stat .n{font-variant-numeric:tabular-nums;color:var(--cream-dim);font-size:clamp(1.3rem,2.6vw,2.4rem);font-weight:600}
+  .stat .l{font-family:var(--font-cap);font-size:clamp(.6rem,1vw,.85rem);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--sage);margin-top:.4vh}
+
+  /* ===== COOKED ===== */
+  .prompt{font-family:var(--font-poster);font-size:clamp(2.5rem,9vw,7rem);color:var(--cream)}
+  .keydots{display:flex;gap:1vw;margin-top:2vh}
+  .keydots span{width:clamp(7px,.8vw,12px);height:clamp(7px,.8vw,12px);border:1px solid var(--orange);opacity:.6}
+
+  /* ===== DONE — confirmation only, nothing to interpret ===== */
+  .check{width:clamp(64px,9vw,130px);height:clamp(64px,9vw,130px);border:2px solid var(--orange);
+    border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .check svg{width:46%;height:46%}
+  .done-label{font-family:var(--font-poster);font-size:clamp(2rem,6vw,5rem);color:var(--cream);margin-top:2vh}
+  .done-sub{font-family:var(--font-cap);font-size:clamp(.7rem,1.1vw,1rem);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--sage);margin-top:.6vh}
+
+  #fallback{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:1vh;background:var(--void);color:var(--cream-dim);font-family:var(--font-mono)}
+</style>
+
+<div class="brand"><span class="badge"></span><span class="name">Chope</span></div>
+
+<div class="screen" data-state="open" id="screen">
+  <svg width="0" height="0"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0.95  0 0 0 0 0.86  0 0 0 0.35 0"/></filter></svg>
+  <div class="grain" style="filter:url(#grain)"></div>
+
+  <section class="view view-open">
+    <div class="chip">poll open</div>
+    <div class="ring-box">
+      <svg class="ring" viewBox="0 0 64 64">
+        <circle class="track" cx="32" cy="32" r="29"/>
+        <circle class="prog" id="ringProg" cx="32" cy="32" r="29" stroke-dasharray="182.2" stroke-dashoffset="182.2"/>
+      </svg>
+      <div class="ring-mid">
+        <div class="ring-value" id="countdown">—:—:—</div>
+        <div class="ring-cap">until your number</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view view-cook">
+    <div class="chip">locked</div>
+    <div class="timestamp" id="cookTime"></div>
+    <div class="hero" id="cookNumber">0</div>
+    <div class="hero-label">cook</div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="statEat">0</div><div class="l">confirmed</div></div>
+      <div class="stat"><div class="n" id="statNotc">0</div><div class="l">declined</div></div>
+      <div class="stat"><div class="n" id="statUnconf">0</div><div class="l">silent</div></div>
+    </div>
+  </section>
+
+  <section class="view view-cooked">
+    <div class="chip">awaiting count</div>
+    <div class="prompt">Left over?</div>
+    <div class="done-sub">of <span id="ofCooked">0</span> cooked</div>
+    <div class="keydots"><span></span><span></span><span></span><span></span></div>
+  </section>
+
+  <section class="view view-done">
+    <div class="chip">logged</div>
+    <div class="check"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#E64833" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="done-label">Logged</div>
+    <div class="done-sub">back tomorrow, 0700</div>
+  </section>
+</div>
+
+<div id="fallback"><div style="font-family:var(--font-cap);letter-spacing:.3em;text-transform:uppercase">chope</div><div>no data yet</div></div>
+
 <script src="board.js"></script>
 <script>
-if (typeof B !== 'undefined') {
-  const v = {
-    open: ['poll open', '--',      'waiting for the cook cutoff'],
-    cook: ['cook',      B.cook,    `${B.eat} eating · ${B.notc} not · ${B.unconf} silent counted at r=${B.r} · +${B.margin} margin`],
-    done: ['eaten',     B.taken,   `cooked ${B.cook} · ${B.left} left over`],
-  }[B.state];
-  if (v) { l.textContent = v[0]; n.textContent = v[1]; s.textContent = v[2] + '  —  ' + B.t; }
+if (typeof B === 'undefined') {
+  document.getElementById('screen').style.display = 'none';
+  document.getElementById('fallback').style.display = 'flex';
+} else {
+  var screen = document.getElementById('screen');
+  screen.dataset.state = B.state;
+
+  if (B.state === 'cook') {
+    document.getElementById('cookTime').textContent = B.t || '';
+    document.getElementById('statEat').textContent    = B.eat;
+    document.getElementById('statNotc').textContent   = B.notc;
+    document.getElementById('statUnconf').textContent = B.unconf;
+
+    var el = document.getElementById('cookNumber');
+    var reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // The page reloads whole every 5s (meta refresh, not fetch -- see top of file), so
+    // an unconditional count-up would replay from 0 on every single reload while the
+    // board sits in "cook" for hours. localStorage survives the reload (same file://
+    // origin, same kiosk session) so the animation fires once per NEW number, keyed on
+    // date+state+value, then every later 5s refresh just prints the number flat.
+    var sig = B.d + '|cook|' + B.cook, seen = null;
+    try { seen = localStorage.getItem('chope_seen'); } catch (e) {}
+    if (!reduceMotion && seen !== sig) {
+      var target = B.cook, start = performance.now(), dur = 700;
+      requestAnimationFrame(function frame(t) {
+        var p = Math.min(1, (t - start) / dur);
+        el.textContent = Math.round((1 - Math.pow(1 - p, 3)) * target);
+        if (p < 1) requestAnimationFrame(frame);
+      });
+      try { localStorage.setItem('chope_seen', sig); } catch (e) {}
+    } else {
+      el.textContent = B.cook;
+    }
+  }
+
+  // State 'cooked' means the PAN number is already in and the next number is the
+  // leftovers. Naming the pan on screen is what stops the operator keying the same
+  // number twice -- which would post taken=0 and drive r to the floor silently.
+  if (B.state === 'cooked') {
+    document.getElementById('ofCooked').textContent = B.actual;
+  }
+
+  if (B.state === 'open') {
+    var CIRC = 182.2; // 2*pi*29, matches the r=29 circle above
+    function tick() {
+      var ringVal = document.getElementById('countdown');
+      var ringProg = document.getElementById('ringProg');
+      if (!B.cutoff) { ringVal.textContent = '—:—:—'; return; }
+      var now = new Date();
+      var parts = B.cutoff.split(':');
+      var cutoff = new Date(now);
+      cutoff.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+      var remain = Math.max(0, cutoff - now);           // clamp at 0: never claim "tomorrow"
+      var h = String(Math.floor(remain / 3600000)).padStart(2, '0');
+      var m = String(Math.floor(remain / 60000) % 60).padStart(2, '0');
+      var s = String(Math.floor(remain / 1000) % 60).padStart(2, '0');
+      ringVal.textContent = h + ':' + m + ':' + s;
+      var open_ = new Date(now); open_.setHours(7, 0, 0, 0);   // matches install.sh's OPEN_AT
+      var total = Math.max(1, cutoff - open_);
+      var frac = Math.max(0, Math.min(1, remain / total));
+      ringProg.style.strokeDashoffset = CIRC * (1 - frac);
+    }
+    tick(); setInterval(tick, 1000);
+  }
 }
 </script>
