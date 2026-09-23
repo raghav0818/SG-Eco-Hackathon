@@ -242,14 +242,22 @@ def main():
     frames = load_frames()
     if not frames:
         sys.exit("no usable frames in %s -- run capture.py first" % FRAMES)
-    client = _client()
+    # Built on FIRST USE, not up front. A fully-cached run -- layout.json on disk and
+    # every frame already in readings.csv -- then needs no key, no network and no
+    # google-genai installed at all. That makes a resumed run after a crash free, and
+    # it is what lets demo_week.py drive the real analysis chain with no API access.
+    _c = {}
+    def client():
+        if "c" not in _c:
+            _c["c"] = _client()
+        return _c["c"]
 
     # Cached: the layout costs a call, never changes mid-week, and report.py needs
     # the boxes to crop a single tray out of the two photographs.
     if os.path.exists(LAYOUT):
         layout = json.load(open(LAYOUT))
     else:
-        layout = read_layout(client, frames[0]["path"])
+        layout = read_layout(client(), frames[0]["path"])
         json.dump(layout, open(LAYOUT, "w"), indent=1)
     boxes  = {t["tray"]: t["box"] for t in layout["trays"]}
     n      = len(boxes)
@@ -290,13 +298,14 @@ def main():
         os.replace(READINGS + ".tmp", READINGS)   # atomic: never a half-written file
 
     if todo:
+        client()          # warm it single-threaded before the pool races for it
         def one(f):
             # One bad frame must not discard the whole batch: ex.map re-raises on
             # iteration, so an unguarded call means 1000 paid-for readings are lost
             # because the 1001st timed out. Failures are simply left un-cached and
             # retried on the next run.
             try:
-                return f, read_fills(client, f["path"], n)
+                return f, read_fills(client(), f["path"], n)
             except Exception as e:                # noqa: BLE001 - any failure is a skip
                 print("  seq %06d failed: %s" % (f["seq"], e), file=sys.stderr)
                 return f, None

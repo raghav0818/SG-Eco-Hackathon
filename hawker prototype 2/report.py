@@ -145,8 +145,11 @@ exact. Lean on the exact one.""" % (ctx, table, dish, worst["day"], LEVERS)])
 HTML = """<!doctype html><meta charset="utf-8"><title>%(dish)s &mdash; %(day)s</title>
 <style>
   @page { size: A4 portrait; margin: 14mm; }
+  html { background: #fff; }
+  /* background stated explicitly: this is a sheet of paper, and a viewer in dark
+     mode would otherwise paint its own ground behind #111 text and lose the page. */
   body { font: 16px/1.5 system-ui, "Segoe UI", Arial, sans-serif; color: #111;
-         max-width: 182mm; margin: 0 auto; }
+         background: #fff; max-width: 182mm; margin: 0 auto; padding: 8mm 0; }
   h1 { font-size: 34px; margin: 0 0 2mm; text-transform: uppercase; letter-spacing: .02em; }
   .day { color: #666; font-size: 18px; margin-bottom: 8mm; }
   .pair { display: flex; gap: 6mm; }
@@ -159,7 +162,11 @@ HTML = """<!doctype html><meta charset="utf-8"><title>%(dish)s &mdash; %(day)s</
   .rec span { color: #c0392b; }
   footer { margin-top: 10mm; font-size: 12px; color: #888; }
   .none { border: 1px dashed #bbb; padding: 10mm; text-align: center; color: #888; }
+  .demo { background: #c0392b; color: #fff; padding: 4mm 5mm; margin: 0 0 7mm;
+          font-size: 15px; line-height: 1.4; }
+  .demo b { display: block; font-size: 19px; letter-spacing: .04em; }
 </style>
+%(banner)s
 <h1>%(dish)s</h1><div class="day">%(day)s</div>
 <div class="pair">
   <figure>%(img_open)s<figcaption><b>%(t_open)s</b>full tray</figcaption></figure>
@@ -172,9 +179,20 @@ measured exactly; "cooked" is a lower bound.</footer>
 """
 
 
+# Set TW_DEMO=1 and the page says so, in red, above the headline. The stamp is a
+# property of the code so it cannot be forgotten off a slide: a rehearsal on invented
+# numbers is normal and useful, the same page passed off as six real days at her stall
+# is fabricated evidence. Same rule replay.py carries for Chope's --synth ledger.
+BANNER = ('<div class="demo"><b>SYNTHETIC DEMONSTRATION &mdash; NOT REAL DATA</b>'
+          'These numbers were invented by <code>demo_week.py</code> to rehearse the '
+          'page layout before the stall week exists. No tray in this page was '
+          'photographed at any stall, and nothing here is a finding.</div>')
+
+
 def render(dish, worst, rows, finding, rec, img_open, img_close):
     tag = lambda u: ('<img src="%s" alt="">' % u) if u else '<div class="none">no photo</div>'
     return HTML % {
+        "banner": BANNER if os.environ.get("TW_DEMO") else "",
         "dish": dish.upper(), "day": worst["day"],
         "img_open": tag(img_open), "img_close": tag(img_close),
         # Real clock times off the frames, so the captions cannot contradict the photos.
