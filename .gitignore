@@ -10,3 +10,15 @@ __pycache__/
 
 # Tray Watch rehearsal output -- synthetic, never a deliverable
 hawker prototype 2/demo/
+hawker prototype 2/frames/
+hawker prototype 2/readings.csv
+hawker prototype 2/daily.csv
+hawker prototype 2/dishes.csv
+hawker prototype 2/layout.json
+hawker prototype 2/reports/
+hawker prototype 2/console-config.json
+hawker prototype 2/console-job.json
+hawker prototype 2/console-sync.json
+hawker prototype 2/console-cancel.flag
+hawker prototype 2/aim.jpg
+hawker prototype 2/check.jpg

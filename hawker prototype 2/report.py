@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """The A4 page -- the ninety seconds the whole build serves.
 
-    python report.py              # daily.csv -> page.html, one LLM call
+    python report.py              # daily.csv -> reports/draft-*.html, one LLM call
     python report.py --no-llm     # same page, arithmetic sentence, no API
     python report.py --selftest   # picking + rendering, no API, no frames
 
-Open page.html and print it. One sheet, two photographs of HER tray, one sentence,
-one change. Photos are embedded base64 so the page is a single file to hand over.
+Review the versioned draft before approval. Photos are embedded base64.
 
 Four properties this page must keep (06 section 4):
   1. It is HER stall. Two photographs four hours apart are not a claim, they are the
@@ -18,7 +17,8 @@ Four properties this page must keep (06 section 4):
 `--no-llm` is not a debug flag. It is the deadline plan: if the API is down on
 30 Sep the page still prints, with a sentence built from arithmetic.
 """
-import base64, csv, json, os, sys
+import base64, csv, hashlib, html, json, os, sys
+from datetime import datetime, timezone
 from collections import defaultdict
 
 HERE   = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +26,7 @@ FRAMES = os.environ.get("TW_FRAMES") or os.path.join(HERE, "frames")
 DAILY  = os.path.join(HERE, "daily.csv")
 LAYOUT = os.path.join(HERE, "layout.json")
 CTX    = os.path.join(HERE, "context.md")
-PAGE   = os.path.join(HERE, "page.html")
+REPORTS = os.path.join(HERE, "reports")
 MODEL  = os.environ.get("TW_MODEL", "claude-opus-5")
 
 LEVERS = """L1 which dishes sit next to which (free, 30 seconds, at open)
@@ -38,11 +38,13 @@ L6 how much raw ingredient to buy"""
 
 
 def pick(rows):
-    """The dish that came back worst, by mean leftover at close -- the EXACT number.
+    """The mapped dish with the highest camera-estimated closing fill.
     Not by over_provision, which divides by served_total and inherits its -9.5%."""
     by = defaultdict(list)
     for r in rows:
-        if r.get("leftover_close") not in ("", None):
+        if (r.get("mapping_status") == "mapped" and
+            r.get("left_at_close") == "1" and
+            r.get("leftover_close") not in ("", None)):
             by[r["dish"]].append(r)
     if not by:
         return None, None
@@ -73,13 +75,7 @@ def photo(seq, box):
 
 
 def tray_pct(worst):
-    """How much of a TRAY came back. A fill-point IS one percent of a heaped tray, so
-    leftover_close is already the answer and no division is needed.
-
-    Do NOT compute leftover_close / cooked_total: leftover is exact and cooked is the
-    ~9.5%-low number, so that ratio reads HIGH -- a truly half-full tray prints as 55%
-    still there, on the one page whose whole credibility is that she can check it
-    against the photograph. pick() rejects over_provision for exactly this reason."""
+    """Camera-estimated fill points, never food mass or waste measured in kg."""
     return round(float(worst["leftover_close"]))
 
 
@@ -89,10 +85,10 @@ def sentence(dish, worst, rows, use_llm):
     pct = tray_pct(worst)
     late = worst.get("last_refill_ts", "")
     if not use_llm:
-        f = "The %s tray was still %d%% full at close." % (dish, pct)
+        f = "The %s tray looked about %d%% full at close (camera estimate)." % (dish, pct)
         if late:
             f += " You topped it up again at %s." % late[11:16]
-        return f, "Cook less %s tomorrow." % dish
+        return f, "Try preparing less %s tomorrow." % dish
 
     from google import genai
     ctx = open(CTX, encoding="utf-8").read() if os.path.exists(CTX) else \
@@ -126,16 +122,16 @@ HER WEEK, in fill-points (100 = a heaped tray at opening):
 THE DISH THIS PAGE IS ABOUT: %s, on %s.
 
 Write exactly two things.
-`finding`: ONE sentence, plain words, about what came back. Units are TRAYS and \
-PERCENTAGES, never grams. Numbers she can check against the two photographs.
+`finding`: ONE sentence, plain words, about what appears in the closing photo. \
+Call all percentages camera estimates; never claim measured mass or proven waste saved.
 `recommendation`: ONE change, phrased as an instruction, that is free, takes under a \
 minute, and she can undo tomorrow. It MUST be one of her six levers:
 %s
 
 Do not suggest anything outside that list -- no loyalty schemes, no pricing, no new \
 dishes, no signage. Do not tell her which dishes sell slowly; she has known for years. \
-Note: `cooked` is a LOWER BOUND (it under-counts by about 10%%); `left at close` is \
-exact. Lean on the exact one.""" % (ctx, table, dish, worst["day"], LEVERS)])
+Note: both `cooked` and `left at close` are camera-based estimates. There is no \
+field validation of their accuracy. Do not call them exact.""" % (ctx, table, dish, worst["day"], LEVERS)])
     if not r.text:
         raise RuntimeError("empty response; --no-llm writes the page without this call")
     d = json.loads(r.text)
@@ -169,74 +165,101 @@ HTML = """<!doctype html><meta charset="utf-8"><title>%(dish)s &mdash; %(day)s</
 %(banner)s
 <h1>%(dish)s</h1><div class="day">%(day)s</div>
 <div class="pair">
-  <figure>%(img_open)s<figcaption><b>%(t_open)s</b>full tray</figcaption></figure>
-  <figure>%(img_close)s<figcaption><b>%(t_close)s</b>still %(pct)s%% full</figcaption></figure>
+  <figure>%(img_open)s<figcaption><b>%(t_open)s</b>first observed fill</figcaption></figure>
+  <figure>%(img_close)s<figcaption><b>%(t_close)s</b>about %(pct)s%% full, camera estimate</figcaption></figure>
 </div>
 <p class="finding">%(finding)s</p>
 <p class="rec"><span>&#9658;</span> %(rec)s</p>
-<footer>Tray Watch &middot; your own stall, %(ndays)s service days &middot; "left at close" is
-measured exactly; "cooked" is a lower bound.</footer>
+<footer>Tray Watch &middot; %(source)s &middot; %(ndays)s service days &middot;
+Visual estimates from photographs; no food weight or waste saving measured.</footer>
 """
 
 
-# Set TW_DEMO=1 and the page says so, in red, above the headline. The stamp is a
-# property of the code so it cannot be forgotten off a slide: a rehearsal on invented
-# numbers is normal and useful, the same page passed off as six real days at her stall
-# is fabricated evidence. Same rule replay.py carries for Chope's --synth ledger.
+# The dedicated demo checkout gets this banner from its directory provenance.
 BANNER = ('<div class="demo"><b>SYNTHETIC DEMONSTRATION &mdash; NOT REAL DATA</b>'
           'These numbers were invented by <code>demo_week.py</code> to rehearse the '
           'page layout before the stall week exists. No tray in this page was '
           'photographed at any stall, and nothing here is a finding.</div>')
 
 
+def source_kind():
+    """Demo provenance comes from the dedicated demo checkout, not page wording."""
+    return "synthetic" if os.path.basename(os.path.normpath(HERE)) == "demo" else "field"
+
+
 def render(dish, worst, rows, finding, rec, img_open, img_close):
-    tag = lambda u: ('<img src="%s" alt="">' % u) if u else '<div class="none">no photo</div>'
+    def tag(u):
+        if not u:
+            return '<div class="none">no photo</div>'
+        if not u.startswith("data:image/jpeg;base64,"):
+            raise ValueError("report image must be an embedded JPEG")
+        return '<img src="%s" alt="Photograph of the tray">' % html.escape(u, quote=True)
     return HTML % {
-        "banner": BANNER if os.environ.get("TW_DEMO") else "",
-        "dish": dish.upper(), "day": worst["day"],
+        "banner": BANNER if source_kind() == "synthetic" else "",
+        "dish": html.escape(dish.upper()), "day": html.escape(worst["day"]),
         "img_open": tag(img_open), "img_close": tag(img_close),
         # Real clock times off the frames, so the captions cannot contradict the photos.
-        "t_open": worst.get("open_ts", ""), "t_close": worst.get("close_ts", ""),
+        "t_open": html.escape(worst.get("open_ts", "")),
+        "t_close": html.escape(worst.get("close_ts", "")),
         "pct": tray_pct(worst),
-        "finding": finding, "rec": rec,
+        "finding": html.escape(finding), "rec": html.escape(rec),
         "ndays": len({r["day"] for r in rows}),
+        "source": "SYNTHETIC DEMONSTRATION" if source_kind() == "synthetic" else "field photographs",
     }
 
 
 def main():
     if not os.path.exists(DAILY):
         sys.exit("no daily.csv -- run analyse.py first")
-    rows = list(csv.DictReader(open(DAILY)))
+    with open(DAILY, newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    if not rows or any(r.get("mapping_status") != "mapped" for r in rows):
+        sys.exit("report ineligible: each analyzed period needs a complete, time-block dish roster")
     dish, worst = pick(rows)
     if not dish:
-        sys.exit("daily.csv has no usable leftover_close values")
-    box = None
+        sys.exit("report ineligible: no named dish has an observed closing fill")
+    boxes = {}
     if os.path.exists(LAYOUT):
-        box = {t["tray"]: t["box"] for t in json.load(open(LAYOUT))["trays"]} \
-            .get(int(worst["slot"]))
+        with open(LAYOUT, encoding="utf-8") as fh:
+            boxes = {t["tray"]: t["box"] for t in json.load(fh)["trays"]}
+    if int(worst["open_slot"]) not in boxes or int(worst["close_slot"]) not in boxes:
+        sys.exit("report ineligible: source tray boxes are missing from layout.json")
     finding, rec = sentence(dish, worst, rows, "--no-llm" not in sys.argv)
-    open(PAGE, "w", encoding="utf-8").write(render(
-        dish, worst, rows, finding, rec,
-        photo(worst.get("open_seq"), box), photo(worst.get("close_seq"), box)))
-    print("wrote %s  --  %s, %s\n  %s\n  > %s" % (PAGE, dish, worst["day"], finding, rec))
+    open_img = photo(worst.get("open_seq"), boxes.get(int(worst["open_slot"])))
+    close_img = photo(worst.get("close_seq"), boxes.get(int(worst["close_slot"])))
+    if not open_img or not close_img:
+        sys.exit("report ineligible: source photographs are missing or unreadable")
+    page = render(dish, worst, rows, finding, rec, open_img, close_img)
+    with open(DAILY, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()[:12]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    os.makedirs(REPORTS, exist_ok=True)
+    path = os.path.abspath(os.path.join(REPORTS, "draft-%s-%s.html" % (stamp, digest)))
+    with open(path, "x", encoding="utf-8") as fh:
+        fh.write(page)
+    print("REPORT_PATH=" + path, flush=True)
+    print("draft for review: %s, %s; %s" % (dish, worst["day"], finding))
 
 
 def selftest():
     rows = [
         {"day": "2026-09-22", "slot": "4", "dish": "kangkong", "leftover_close": "60",
          "cooked_total": "100", "served_total": "40", "refills": "2", "last_refill_ts": "2026-09-22 14:15:00",
-         "open_seq": "0", "close_seq": "9", "open_ts": "09:05", "close_ts": "15:02"},
+         "open_seq": "0", "close_seq": "9", "open_ts": "09:05", "close_ts": "15:02",
+         "mapping_status": "mapped", "left_at_close": "1"},
         {"day": "2026-09-23", "slot": "4", "dish": "kangkong", "leftover_close": "50",
-         "cooked_total": "100", "served_total": "50", "refills": "1", "last_refill_ts": ""},
+         "cooked_total": "100", "served_total": "50", "refills": "1", "last_refill_ts": "",
+         "mapping_status": "mapped", "left_at_close": "1"},
         {"day": "2026-09-22", "slot": "2", "dish": "curry chicken", "leftover_close": "5",
-         "cooked_total": "100", "served_total": "95", "refills": "3", "last_refill_ts": ""},
+         "cooked_total": "100", "served_total": "95", "refills": "3", "last_refill_ts": "",
+         "mapping_status": "mapped", "left_at_close": "1"},
     ]
     dish, worst = pick(rows)
     assert dish == "kangkong", dish              # mean leftover 55 vs 5
     assert worst["day"] == "2026-09-22", worst   # its own worst day, not the first
 
     f, r = sentence(dish, worst, rows, use_llm=False)
-    assert "60%" in f and "14:15" in f, f        # the exact number and the late top-up
+    assert "60%" in f and "14:15" in f, f        # estimated fill and source top-up time
     # The headline must be leftover-as-%-of-a-tray, NOT leftover/cooked. With a 9.5%-low
     # cooked_total those differ, and only one of them is checkable against the photo.
     assert tray_pct(worst) == 60, tray_pct(worst)
@@ -245,16 +268,24 @@ def selftest():
     assert "KANGKONG" in html and "no photo" in html and "60%" in html
     assert "09:05" in html and "15:02" in html, "captions must carry the real frame times"
     assert html.count("class=\"rec\"") == 1, "more than one recommendation on the page"
+    hostile = render("<script>x</script>", dict(worst, day='"<bad>', open_ts='<a>'),
+                     rows, '<img src=x onerror=alert(1)>', '<b>wrong</b>', None, None)
+    assert "<script>" not in hostile and "<img src=x" not in hostile and "<b>wrong" not in hostile
+    assert "&lt;script&gt;" in hostile.lower() and "&lt;b&gt;wrong&lt;/b&gt;" in hostile
 
     # A day where nothing sold must not divide by zero, and blanks must not crash.
     assert pick([{"dish": "x", "leftover_close": ""}]) == (None, None)
     z = [{"day": "d", "slot": "1", "dish": "x", "leftover_close": "0",
+          "mapping_status": "mapped", "left_at_close": "1",
           "cooked_total": "0", "served_total": "0", "refills": "0", "last_refill_ts": ""}]
     d2, w2 = pick(z)
     render(d2, w2, z, *sentence(d2, w2, z, use_llm=False), None, None)
-    print("ok  |  picks the worst dish by the EXACT number, then its own worst day; "
+    print("ok  |  picks the worst mapped closing estimate, then its own worst day; "
           "one recommendation; zero-cooked and blank rows do not crash")
 
 
 if __name__ == "__main__":
+    bad = [arg for arg in sys.argv[1:] if arg not in ("--selftest", "--no-llm")]
+    if bad:
+        sys.exit("unknown argument %s" % bad[0])
     selftest() if "--selftest" in sys.argv else main()

@@ -1,5 +1,7 @@
 # Tray Watch — Pi setup, step by step
 
+For day-to-day control from a laptop browser, use [CONSOLE.md](CONSOLE.md). The one-time Pi installation below is still required; after that, the console handles status, crop previews, capture controls, frame copying, dish maps, analysis, and report review.
+
 Everything you need, in the order you need it. Tonight is ~40 minutes at your desk.
 Tomorrow at the stall is ~15 minutes, and 10 of those are her talking.
 

@@ -163,16 +163,20 @@ def main():
 
     env = dict(os.environ, TW_DEMO="1")
     env.pop("TW_FRAMES", None)              # demo/frames, not whatever is exported
+    report_path = None
     for cmd in (["analyse.py"], ["report.py", "--no-llm"]):
         r = subprocess.run([sys.executable] + cmd, cwd=DEMO, env=env,
                            capture_output=True, text=True)
         print(r.stdout.strip() or r.stderr.strip())
+        if cmd[0] == "report.py":
+            report_path = next((line.split("=", 1)[1] for line in r.stdout.splitlines()
+                                if line.startswith("REPORT_PATH=")), None)
         if r.returncode:
             sys.exit("%s failed" % cmd[0])
 
     print("\n%d frames over %d days, %d trays -- zero API calls (all pre-cached)."
           % (n, len(DAYS), N))
-    print("open: %s" % os.path.join(DEMO, "page.html"))
+    print("open: %s" % (report_path or os.path.join(DEMO, "reports")))
     print("The page carries a red SYNTHETIC banner. Do not remove it.")
 
 

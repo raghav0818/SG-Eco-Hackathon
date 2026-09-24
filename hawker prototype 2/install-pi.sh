@@ -9,12 +9,18 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 USER_=$(id -un)
+CONF_DIR="$HOME/.config/traywatch"
+CROP_FILE="$CONF_DIR/capture.env"
+DEV_="${TW_DEV:-}"
+[ -n "$DEV_" ] || DEV_=$(sed -n 's/^TW_DEV=//p' "$CROP_FILE" 2>/dev/null | head -1)
+[ -n "$DEV_" ] || DEV_=/dev/video0
 
 LAPTOP="${LAPTOP:-}"          # e.g. raghav@192.168.1.20 -- blank disables the rsync cron
 EVERY=120                     # seconds between frames
 CLOSE="20 19"                 # mirror to USB and power down (cron: MIN HOUR)
                               # She closes 19:00 [T7, 22 Sep]. Mirror 19:20, shutdown 19:35.
 
+[ -n "${TW_CROP:-}" ] || TW_CROP=$(sed -n 's/^TW_CROP=//p' "$CROP_FILE" 2>/dev/null | head -1)
 [ -n "$TW_CROP" ] || {
   echo "TW_CROP is not set."
   echo "  1.  python3 capture.py --aim      # writes a blurred 240px aim.jpg + grid"
@@ -23,6 +29,27 @@ CLOSE="20 19"                 # mirror to USB and power down (cron: MIN HOUR)
   echo "  4.  TW_CROP=\$TW_CROP sh install-pi.sh"
   exit 1
 }
+python3 - "$TW_CROP" <<'PY'
+import sys
+try:
+    parts = [int(part) for part in sys.argv[1].split(",")]
+    assert len(parts) == 4 and min(parts[:2]) >= 0 and min(parts[2:]) > 0
+    assert max(parts) <= 10000
+except (AssertionError, ValueError):
+    sys.exit("TW_CROP must be x,y,w,h with nonnegative origin and positive size")
+PY
+python3 - "$DEV_" <<'PY'
+import re, sys
+if not re.fullmatch(r"/dev/video[0-9]+", sys.argv[1]):
+    sys.exit("TW_DEV must name a /dev/videoN camera")
+PY
+mkdir -p "$CONF_DIR"
+chmod 700 "$CONF_DIR"
+# The bridge will replace this same user-owned file atomically after a checked preview.
+umask 077
+printf 'TW_CROP=%s\nTW_DEV=%s\n' "$TW_CROP" "$DEV_" > "$CROP_FILE.tmp"
+mv -f "$CROP_FILE.tmp" "$CROP_FILE"
+chmod 600 "$CROP_FILE"
 
 echo "== 1. packages (v4l2-ctl via apt; OpenCV via pip -- see note below)"
 dpkg -s v4l-utils >/dev/null 2>&1 || sudo apt-get install -y v4l-utils \
@@ -68,39 +95,68 @@ After=time-sync.target
 Wants=time-sync.target
 [Service]
 User=$USER_
-WorkingDirectory=$HERE
-Environment=TW_CROP=$TW_CROP
+WorkingDirectory="$HERE"
+EnvironmentFile="$CROP_FILE"
 Environment=TW_EVERY=$EVERY
-Environment=TW_DEV=${TW_DEV:-/dev/video0}
-Environment=TW_FRAMES=$HERE/frames
-ExecStart=/usr/bin/python3 $HERE/capture.py
+Environment="TW_FRAMES=$HERE/frames"
+ExecStart=/usr/bin/python3 "$HERE/capture.py"
 Restart=always
 RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
+sudo systemd-analyze verify /etc/systemd/system/traywatch.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now traywatch.service
+
+echo "== 3c. allow only capture start, stop, and restart from the SSH console"
+[ -x /usr/bin/systemctl ] || { echo "expected /usr/bin/systemctl for restricted sudoers" >&2; exit 1; }
+SUDO_TMP=$(mktemp)
+printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl start traywatch.service, /usr/bin/systemctl stop traywatch.service, /usr/bin/systemctl restart traywatch.service\n' "$USER_" > "$SUDO_TMP"
+sudo visudo -cf "$SUDO_TMP"
+sudo install -o root -g root -m 0440 "$SUDO_TMP" /etc/sudoers.d/traywatch-console
+rm -f "$SUDO_TMP"
 
 echo "== 4. timezone (cron times are local, and Imager defaults to Europe/London)"
 TZ_=$(timedatectl show -p Timezone --value 2>/dev/null)
 [ "$TZ_" = "Asia/Singapore" ] || { sudo timedatectl set-timezone Asia/Singapore; sudo systemctl restart cron 2>/dev/null || true; }
 
-echo "== 5. cron: rsync out every 10 min, USB mirror and shutdown at close"
+echo "== 5. cron: rsync out every 10 min and USB mirror at close"
 CRON_=$(mktemp)
 crontab -l 2>/dev/null | grep -v '# traywatch' > "$CRON_" || true
 [ -n "$LAPTOP" ] && cat >> "$CRON_" <<EOF
 */10 * * * * rsync -az --partial --append-verify "$HERE/frames/" "$LAPTOP:~/traywatch/frames/"  # traywatch
 EOF
-# +15 min, carried properly: a naive $1+15 emits minute 65 for CLOSE="50 14" and
-# crontab then rejects the WHOLE file, taking the rsync line down with it.
-SHUT=$(echo "$CLOSE" | awk '{m=($2*60+$1+15)%1440; printf "%d %d", m%60, int(m/60)}')
 cat >> "$CRON_" <<EOF
 $CLOSE * * * [ -d /media/usb ] && rsync -a "$HERE/frames/" /media/usb/frames/ && sync  # traywatch
-$SHUT * * * /sbin/shutdown -h now  # traywatch
 EOF
 crontab "$CRON_"
 rm -f "$CRON_"
+
+echo "== 5b. root-owned shutdown timer, 15 minutes after the USB mirror"
+# The old normal-user crontab could not reliably run /sbin/shutdown. A root-owned
+# systemd timer also avoids granting OS shutdown to the localhost console.
+SHUT_HM=$(echo "$CLOSE" | awk '{m=($2*60+$1+15)%1440; printf "%02d:%02d:00", int(m/60), m%60}')
+sudo tee /etc/systemd/system/traywatch-shutdown.service >/dev/null <<EOF
+[Unit]
+Description=Power down Tray Watch Pi after close
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/shutdown -h now
+EOF
+sudo tee /etc/systemd/system/traywatch-shutdown.timer >/dev/null <<EOF
+[Unit]
+Description=Daily Tray Watch shutdown
+[Timer]
+OnCalendar=*-*-* $SHUT_HM
+Persistent=false
+Unit=traywatch-shutdown.service
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemd-analyze verify /etc/systemd/system/traywatch-shutdown.service /etc/systemd/system/traywatch-shutdown.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now traywatch-shutdown.timer
 [ -n "$LAPTOP" ] || echo "   LAPTOP is unset, so no rsync cron. The USB mirror is your only"
 [ -n "$LAPTOP" ] || echo "   second copy -- set LAPTOP=user@host and re-run to fix that."
 

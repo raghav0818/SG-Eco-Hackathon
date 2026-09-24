@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="traywatch-token" content="__TOKEN__">
+  <title>Tray Watch / Console</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div><strong>Tray Watch</strong><small>Operator console</small></div></div>
+      <nav aria-label="Sections">
+        <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="camera">Camera & crop</button>
+        <button class="nav" data-view="frames">Frames & dishes</button>
+        <button class="nav" data-view="analysis">Analysis & report</button>
+      </nav>
+      <div class="rail-foot"><span id="rail-connection">Checking Pi…</span><small>Local browser · Pi by SSH</small></div>
+    </aside>
+    <main>
+      <header class="topline"><div><span class="eyebrow">SUTD cai png stall / prototype 2</span><h1 id="page-title">Overview</h1></div><div class="top-right"><span id="updated">Checking…</span><button id="refresh" class="subtle">Refresh</button></div></header>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+
+      <section class="view active" id="view-overview" aria-labelledby="page-title">
+        <div class="status-strip">
+          <div><span>Capture</span><strong id="capture-status">Checking…</strong><small id="capture-sub">—</small></div>
+          <div><span>Last valid frame</span><strong id="frame-time">—</strong><small id="frame-age">—</small></div>
+          <div><span>Pi clock</span><strong id="clock-status">—</strong><small id="clock-sub">—</small></div>
+          <div><span>Laptop mirror</span><strong id="mirror-count">—</strong><small id="mirror-time">—</small></div>
+        </div>
+        <div class="overview-grid">
+          <div class="image-stage"><div class="section-head"><h2>Latest tray image</h2><span id="photo-source">Pi capture</span></div><img id="latest-image" alt="Latest privacy cropped view of the food display" hidden><div id="latest-empty" class="empty">No image from the Pi yet. Check the connection and capture status.</div><div class="caption" id="latest-caption">The image updates when a new two-minute frame is stored.</div></div>
+          <div class="reading-panel"><div class="section-head"><h2>Today’s recording</h2><span>Pi CSV</span></div><div class="big-number" id="today-valid">—</div><p>valid frames stored</p><dl><div><dt>Recent camera failures</dt><dd id="today-gaps">—</dd></div><div><dt>Capture interval</dt><dd id="cadence">—</dd></div><div><dt>White balance</dt><dd id="wb-status">—</dd></div><div><dt>Storage free</dt><dd id="storage">—</dd></div></dl><button id="sync-now" class="primary">Copy frames to laptop</button><p class="hint">Capture continues on the Pi if this page or Wi‑Fi closes.</p></div>
+        </div>
+        <div class="diagnostic"><div><h2>Capture timeline</h2><p>Recent stored attempts. A gap marker means the camera failed for that attempt.</p></div><div id="timeline" class="timeline" aria-label="Recent capture attempts"></div></div>
+      </section>
+
+      <section class="view" id="view-camera" aria-labelledby="camera-heading">
+        <div class="section-intro"><div><span class="eyebrow">Set up once, check whenever the camera moves</span><h2 id="camera-heading">Camera & privacy crop</h2><p>Only the chosen tray area is saved during recording. Review the crop for people before applying it.</p></div><div class="service-actions"><button data-service="start">Start capture</button><button data-service="restart">Restart</button><button data-service="stop" class="danger">Stop</button></div></div>
+        <div class="two-col"><div><div class="section-head"><h3>1 / Find the tray row</h3><span>Blurred preview</span></div><p class="hint">This small image is blurred before it reaches the laptop. If the camera is busy, stop capture briefly and restart it after checking.</p><button id="aim" class="subtle">Get aiming image</button><div class="preview"><img id="aim-image" alt="Blurred camera image with grid" hidden><div id="aim-empty" class="empty">No aiming image yet.</div></div></div><div><div class="section-head"><h3>2 / Check a crop</h3><span>In-memory preview</span></div><label for="crop">Crop coordinates · x, y, width, height</label><div class="field-row"><input id="crop" inputmode="numeric" placeholder="e.g. 120,340,1600,500"><button id="check-crop">Preview crop</button></div><p class="hint">Include every tray and the grey card. Exclude customers and staff. This candidate image is not saved on the Pi.</p><div class="preview"><img id="crop-image" alt="Candidate cropped camera view" hidden><div id="crop-empty" class="empty">Preview the crop before applying it.</div></div><label class="check"><input id="crop-confirm" type="checkbox"> I checked the image: no person is visible; all trays and the grey card are visible.</label><button id="apply-crop" class="primary" disabled>Apply crop & restart capture</button></div></div>
+      </section>
+
+      <section class="view" id="view-frames" aria-labelledby="frames-heading">
+        <div class="section-intro"><div><span class="eyebrow">Copied from Pi to this laptop</span><h2 id="frames-heading">Frames & dishes</h2><p>Browse the actual images and name each dish in its slot. Add a new block when trays move during the day.</p></div><button id="sync-frames">Copy frames now</button></div>
+        <div class="two-col frames-layout"><div><div class="section-head"><h3>Recent frames</h3><span id="frame-count">—</span></div><div id="frame-list" class="frame-list"></div><div class="preview large"><img id="selected-frame" alt="Selected captured tray row" hidden><div id="selected-empty" class="empty">Select a copied frame to inspect it.</div></div><p id="selected-caption" class="caption"></p></div><div><div class="section-head"><h3>Dish map</h3><span>Manual labels</span></div><p class="hint">One row per slot for each time block. Use a second block with its actual start time after a tray swap. A missing map is treated as unknown.</p><div class="roster-toolbar"><label>Day <input id="roster-day" type="date"></label><button id="load-roster" class="subtle">Load day</button></div><div id="roster-rows"></div><div class="roster-toolbar"><button id="add-row" class="subtle">Add dish</button><button id="add-block" class="subtle">Add time block</button><button id="save-roster" class="primary">Save dish map</button></div></div></div>
+      </section>
+
+      <section class="view" id="view-analysis" aria-labelledby="analysis-heading">
+        <div class="section-intro"><div><span class="eyebrow">Run on laptop · review before printing</span><h2 id="analysis-heading">Analysis & report</h2><p>Image readings are camera estimates. The report is a draft until you inspect its photos and wording.</p></div></div>
+        <div class="workflow"><div><span class="step">1</span><div><h3>Read tray fill</h3><p>Uses Gemini on uncached frames. Set the API key in the console’s environment, not this browser.</p><p id="cost-estimate">Calculating remaining calls…</p><button id="run-analysis">Run analysis</button></div></div><div><span class="step">2</span><div><h3>Inspect daily rows</h3><p id="daily-summary">No analysed days yet.</p><div class="table-wrap"><table><thead><tr><th>Day</th><th>Dish</th><th>Close estimate</th><th>Refills</th><th>Mapping</th></tr></thead><tbody id="daily-table"></tbody></table></div></div></div><div><span class="step">3</span><div><h3>Create a draft</h3><p>Use the offline wording fallback if the recommendation model is unavailable. Each draft is saved separately.</p><button id="run-report">Create AI draft</button><button id="run-fallback" class="subtle">Create simple draft</button></div></div></div>
+        <div class="job-panel"><div class="section-head"><h3>Current operation</h3><button id="cancel-job" class="subtle" disabled>Cancel</button></div><strong id="job-status">Idle</strong><p id="job-progress">No operation has started.</p><pre id="job-log" aria-label="Operation log"></pre></div>
+        <div class="report-panel"><div class="section-head"><h3>Report draft</h3><span id="draft-name">None yet</span></div><p class="hint">Confirm that the photos, dish, times and advice match the source data. Approval makes a separate printable copy.</p><iframe id="draft-preview" title="Tray Watch report draft" sandbox="" hidden></iframe><div id="draft-empty" class="empty">Create a report to preview it here.</div><label class="check"><input id="report-confirm" type="checkbox"> I reviewed the report and its source photos.</label><button id="approve-report" class="primary" disabled>Approve printable copy</button><div id="approved-list" class="approved-list"></div></div>
+      </section>
+
+      <details class="settings"><summary>Pi connection settings</summary><p>The Pi must already have this checkout and `pi_bridge.py`. SSH key access and narrow service permissions are set up once on the Pi.</p><div class="settings-grid"><label>Pi host<input id="setting-host" autocomplete="off"></label><label>Pi user<input id="setting-user" autocomplete="off"></label><label>Project path on Pi<input id="setting-dir" autocomplete="off"></label></div><button id="save-settings">Save connection</button></details>
+      <footer>Tray Watch records tray appearance. It does not measure kilograms or prove food waste avoided.</footer>
+    </main>
+  </div>
+</body>
+</html>

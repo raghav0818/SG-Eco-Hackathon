@@ -130,3 +130,19 @@ assert [m for m in sent if m not in ("getStickerSet", "sendSticker")] == [
     "sendMessage", "sendPoll", "sendMessage", "sendPoll"], sent   # crown, menu, morning, lunch
 assert G.load()["month"] == time.strftime("%Y-%m")
 print("ok  |  month end: crown, tie-break on saved, reset, hall of fame, no double/backward roll")
+
+# keypad.py: numpad OR keyboard.  Imported without evdev -- main() holds that import.
+import keypad as P
+assert [P.digit(k) for k in ("KEY_7", "KEY_KP7", "KEY_0")] == ["7", "7", "0"]
+assert not any(P.digit(k) for k in ("KEY_F7", "KEY_F10", "KEY_NUMERIC_7", "KEY_KPENTER", "KEY_A"))
+class E:  # the ecodes the picker reads; values arbitrary
+    EV_KEY, KEY_ENTER, KEY_KPENTER, KEY_1, KEY_KP1 = 1, 28, 96, 2, 79
+class D:
+    def __init__(s, name, *keys): s.name, s.keys = name, keys
+    def capabilities(s): return {E.EV_KEY: list(s.keys)}
+hdmi, kbd = D("vc4-hdmi-0", E.KEY_ENTER), D("tkl keyboard", E.KEY_ENTER, E.KEY_1)
+pad = D("numpad", E.KEY_KPENTER, E.KEY_KP1)
+assert P.pick([hdmi], E) is None                     # HDMI CEC has Enter but no digits
+assert P.pick([hdmi, kbd], E) is kbd                 # a plain keyboard works
+assert P.pick([kbd, pad], E) is pad                  # numpad preferred when both
+print("ok  |  keypad: numpad or keyboard, top-row digits, F-keys ignored, HDMI CEC never grabbed")
