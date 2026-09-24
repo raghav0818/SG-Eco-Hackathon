@@ -191,9 +191,59 @@ everything needed is already owned.** Core code **written and passing its self-c
   handled). **`python3 chope.py check` proves the token and chat id without posting anything** — run
   it before trusting cron.
 
-Files: `army prototype 1/08-chope-prd.md` (the PRD) · `forecast.py` `chope.py` `keypad.py` `replay.py`
+### Chope gamification — the showcase bot (built 23 Sep)
+
+Mentor, 23 Sep: *"for Chope, do consider to look into 'gamification' for the army personnel's as
+you are targeting the behavioural changes."* Raghav: Chope was "just a counter" and cannot be
+filmed on base. **These were declared the last Chope changes** — the Scale-Up Plan (what gets
+judged) comes next. Decisions: `army prototype 1/13-chope-fun-bot-decisions.md`.
+
+- **Raghav's decisions, do not re-litigate:** live interactive demo on **one phone** in a demo
+  Telegram group; **one live unit**; game lives in **Telegram only** — the kitchen board stays
+  as shipped, it is for the chefs; **no real Telegram trial — all data seeded/faked**, label it
+  on the slide; Wizard-of-Oz demo; **Singlish NS banter**; stickers from **public packs**.
+- **THERE MUST BE A PRIZE, and people must keep coming back — Raghav overruled "no prizes"
+  hard** ("dont dictate your terms anyhow"). `11-chope-gamification-research.md` argued no
+  tangible rewards; **`12-chope-retention-and-prize.md` supersedes that.** The prize is his
+  idea: **the cookhouse cooks a monthly special (e.g. Western) for the winning unit.**
+- **Rules — option B, chosen by Raghav over the threshold version I recommended:** Goal Day =
+  replies ≥ 80% of strength = 1 point; "Not eating" counts exactly like "Eating" so a fake reply
+  earns nothing; **most points at month end wins**, single winner, ties → portions saved.
+  Known accepted cost: leaders coast and laggards give up in single-winner contests.
+- **Individual gamification is impossible by design** — the poll is anonymous, so the unit is
+  the only "account". Every mechanic reads counts only.
+- **Code:** `game.py` (league in `units.json`, gitignored; seed; Goal Day; ranking; month-end
+  `rollover`; all message text; stickers) · `chope.py listen` (long-poll, 9 commands, `/demo`
+  timer) · `board.html` two lines (cutoff with seconds, ring from `B.opened`) · `install.sh`
+  `chope-listen` service · `test_chope.py` game + month-end asserts.
+- **Commands:** `/leaderboard` `/progress` `/saved` `/today` `/menu` `/excuse` `/8ball` `/help`,
+  and `/demo` · `/demo auto` (fakes the kitchen numbers) · `/demo monthend` · `/demo reset`.
+  **Only the configured `CHOPE_CHAT` can drive the bot** — checked by chat id, never user id.
+- **The demo is rigged so the visitor's tap matters:** 90-strong unit, 61+10 = 71 seeded votes,
+  goal 72 — **the visitor's own vote earns the Goal Day** and puts Alpha Coy (tied with Bravo on
+  14) in the lead. No vote → Bravo wins the tie on portions saved. Rivals are made-up
+  (Bravo Coy, Hangar 3, Charlie Coy, Signals Det) — **never real SBAB squadron names** next to
+  fake numbers.
+- **Month end:** first `chope.py open` of a new month crowns the leader **before** the poll,
+  zeroes everyone, opens the champion's menu poll, appends to `champions` (`/leaderboard` shows
+  "Last month: 🏆 …"). Rolls **forward only**, so a `/demo monthend` fast-forward is never undone
+  by cron. Booth sequence: `/demo` → `/demo monthend` → `/leaderboard` → `/demo reset`.
+- **The kitchen buffer (+10%) is off the group message** — performance number about kitchen
+  staff in an NSF chat (`00-master-plan.md` §4.1). Still logged as `buffer_pct` in `meals.csv`.
+- **Self-funding prize, [ASSUMED] prices:** ~95 fewer portions/month/unit ≈ S$140–285 ≈ one
+  special lunch (`12`). Cheapest real ask: let the winner pick the menu of a special day the
+  cookhouse already runs (festive/brand days, PIONEER 2024).
+- **NOT YET DONE (as of 23 Sep):** none of this has touched real Telegram — tested only against
+  a stubbed `tg()` and a dry-run of the listener. **Not committed/pushed** — the Pi pulls from
+  GitHub, so push first. **Sticker packs `UtyaDuck,HotCherry` are unverified** — `chope.py check`
+  on the Pi reports them; a missing pack skips the sticker, never the message. Numpad on the real
+  board: Raghav, 24 Sep. Setup order: demo group → bot as admin → chat id via `getUpdates`
+  **before** `install.sh` starts the listener (it consumes updates) → `install.sh` → `check`.
+
+Files: `army prototype 1/08-chope-prd.md` (the PRD) · `11`/`12`/`13` (gamification research,
+retention + prize, decisions) · `forecast.py` `chope.py` `game.py` `keypad.py` `replay.py`
 `board.html` `install.sh` `test_chope.py` · `07-architecture.md` §6–8 at the repo root.
-**Self-checks, all passing 19 Sep:** `python forecast.py`, `python replay.py demo`,
+**Self-checks, all passing 23 Sep:** `python forecast.py`, `python replay.py demo`,
 `python test_chope.py`.
 
 ## Prototype 2 — Tray Watch (cai png stall, SUTD canteen)
